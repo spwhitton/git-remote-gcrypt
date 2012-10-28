@@ -47,8 +47,6 @@ isnonnull() { ! isnull "$1"; }
 iseq() { case "$1" in "$2") return 0;; *) return 1;; esac; }
 isnoteq() { ! iseq "$@"; }
 
-# Append $2 to $1 with a newline separator
-append() { isnull "$1" || xecho "$1" && xecho "$2"; }
 isurl() { isnull "${2%%$1://*}"; }
 islocalrepo() { isnull "${1##/*}" && [ ! -e "$1/HEAD" ]; }
 
@@ -66,6 +64,18 @@ tac() { sed '1!G;h;$!d'; }
 setvar()
 {
 	eval $1=\$2
+}
+
+Newline="
+"
+
+# $1 is return var, $2 is value appended with newline separator
+append_to()
+{
+	local tmp_=
+	eval tmp_=\$$1
+	isnull "$tmp_" || tmp_=$tmp_$Newline
+	setvar "$1" "$tmp_$2"
 }
 
 # Split $1 into $2:$3
@@ -363,7 +373,7 @@ read_config()
 
 		isnonnull "$keyid_" &&
 		signers_="$signers_ $keyid_" &&
-		good_sig=$(append "$good_sig" "^\[GNUPG:\] GOODSIG $keyid_") || {
+		append_to good_sig "^\[GNUPG:\] GOODSIG $keyid_" || {
 			echo_info "WARNING: Skipping missing key $recp_"
 			continue
 		}
@@ -569,8 +579,8 @@ repack_if_needed()
 	fi
 
 	pack_id=$(pack_hash < "$TmpPack_Encrypted")
-	Packlist=$(append "$Packlist" "pack :${Hashtype}:$pack_id $key_")
-	Keeplist=$(append "$Keeplist" "keep :${Hashtype}:$pack_id 1")
+	append_to Packlist "pack :${Hashtype}:$pack_id $key_"
+	append_to Keeplist "keep :${Hashtype}:$pack_id 1"
 	rm -r -f "$Localdir/pack"
 	setvar "$3" yes
 }
@@ -645,8 +655,7 @@ do_push()
 	# Each git packfile is encrypted and then named for the encrypted
 	# file's hash. The manifest is updated with the pack id.
 	# The manifest is encrypted.
-	local remote_has= remote_want= src_= dst_= line_= pack_id= key_= obj_= \
-		pack_delete=
+	local rev_list= src_= dst_= line_= pack_id= key_= obj_= pack_delete=
 	del_hash=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 	ensure_connected
@@ -658,8 +667,8 @@ do_push()
 
 	if isnonnull "$Branchlist"
 	then
-		# filter through batch-check to mark only the commits we have
-		remote_has=$(xecho "$Branchlist" | cut -f 1 -d ' ' |
+		# mark all remote refs with  ^<sha-1> (if sha-1 exists locally)
+		rev_list=$(xecho "$Branchlist" | cut -f 1 -d ' ' |
 			safe_git_rev_parse | sed -e 's/^\(.\)/^&/')
 	fi
 
@@ -669,12 +678,12 @@ do_push()
 		splitcolon "${line_#+}" src_ dst_
 		if isnonnull "$src_"
 		then
-			remote_want=$(append "$remote_want" "$src_")
+			append_to rev_list "$src_"
 			obj_=$(xecho "$src_" | safe_git_rev_parse)
 		else
 			obj_=$del_hash  # Mark for deletion
 		fi
-		Branchlist=$(append "$Branchlist" "$obj_ $dst_")
+		append_to Branchlist "$obj_ $dst_"
 	done <<EOF
 $1
 EOF
@@ -686,8 +695,7 @@ EOF
 	TmpObjlist="$Localdir/tmp_packrevlist.$$"
 	key_=$(genkey "$Packkey_bytes")
 
-	append "$remote_has" "$remote_want" |
-		git rev-list --objects --stdin -- |
+	xecho "$rev_list" | git rev-list --objects --stdin -- |
 		tee "$TmpObjlist" |
 		git pack-objects --stdout | ENCRYPT "$key_">"$TmpPack_Encrypted"
 	# Only send pack if we have any objects to send
@@ -698,7 +706,7 @@ EOF
 
 		if isnoteq "$did_repack" yes
 		then
-		Packlist=$(append "$Packlist" "pack :${Hashtype}:$pack_id $key_")
+			append_to Packlist "pack :${Hashtype}:$pack_id $key_"
 		fi
 		# else, repack rewrote Packlist
 
@@ -788,10 +796,10 @@ do
 		do
 			case "$InputX" in
 			push\ *)
-			args_=$(append "$args_" "${InputX#push }")
+				append_to args_ "${InputX#push }"
 			;;
 			*)
-			break
+				break
 			;;
 			esac
 		done
