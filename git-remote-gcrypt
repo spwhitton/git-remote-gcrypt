@@ -84,7 +84,6 @@ splitcolon()
 	setvar "$2" "${1%%:*}"
 	setvar "$3" "${1#*:}"
 }
-repoidstr() { xecho "repo $Repoid"; }
 
 ## gitception part
 # Fetch giturl $1, file $2
@@ -718,9 +717,13 @@ EOF
 
 	TmpManifest_Enc="$Localdir/tmp_manifest.$$"
 
-	(xecho "$Branchlist"; xecho "$Packlist"; xecho "$Keeplist";
-	repoidstr; xecho "$Extension_list") |
-		PRIVENCRYPT "$Recipients" > "$TmpManifest_Enc"
+	PRIVENCRYPT "$Recipients" > "$TmpManifest_Enc" <<EOF
+$Branchlist
+$Packlist
+$Keeplist
+repo $Repoid
+$Extension_list
+EOF
 
 	# Upload pack
 	if [ -s "$TmpObjlist" ]
