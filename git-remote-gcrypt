@@ -615,7 +615,7 @@ do_fetch()
 	# The PACK id is the hash of the encrypted git packfile.
 	# We only download packs mentioned in the encrypted manifest,
 	# and check their digest when received.
-	local pack_= packline_= pneed_= phave_= premote_=
+	local pack_= packline_= pneed_= premote_=
 
 	ensure_connected
 
@@ -627,10 +627,14 @@ do_fetch()
 
 	TmpPack_Encrypted="$Localdir/tmp_pack_ENCRYPTED_.$$"
 
-	premote_=$(xecho "$Packlist" | cut -f 1-2 -d ' ')
 	# The `+` for $GITCEPTION is pointless but we will be safe for stacking
-	phave_="$(cat "$Localdir/have_packs+" 2>/dev/null || :)"
-	pneed_="$(xecho "$premote_" | xgrep -v -x -e "$phave_")"
+	premote_=$(xecho "$Packlist" | cut -f 1-2 -d ' ')
+	if [ -s "$Localdir/have_packs+" ]
+	then
+		pneed_="$(xecho "$premote_" | xgrep -v -x -f "$Localdir/have_packs+")"
+	else
+		pneed_=$premote_
+	fi
 
 	xecho "$pneed_" | while read packline_
 	do
