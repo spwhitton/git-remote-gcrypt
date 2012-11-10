@@ -88,34 +88,21 @@ splitcolon()
 	setvar "$3" "${1#*:}"
 }
 
-# if $1 contains $2
-contains()
-{
-	isnull "${1##*"$2"*}"
-}
-
 # Pick words from each line
 # $1 return variable name
-# $2 field list "1,2,3"
-# $3 input value
-pick_fields()
+# $2 input value
+pick_fields_1_2()
 {
-	local f_line_= f_result_= f_mask_= f_ret_var= f_oifs="$IFS" IFS=
-	f_ret_var=$1
-	f_mask_=$2
+	local f_ret= f_line= f_var= f_oifs="$IFS" IFS=
+	f_var=$1
 	IFS=$Newline
-	for f_line_ in $3
+	for f_line in $2
 	do
 		IFS=$f_oifs
-		# split $f_line_ into words and pick them out
-		set -- $f_line_
-		f_line_=
-		! contains "$f_mask_" 1 || f_line_=${1:-}
-		! contains "$f_mask_" 2 || f_line_="$f_line_ ${2:-}"
-		! contains "$f_mask_" 3 || f_line_="$f_line_ ${3:-}"
-		append_to @f_result_ "${f_line_# }"
+		set -- $f_line
+		f_ret=$f_ret"${1:-} ${2:-}"$Newline
 	done
-	setvar "$f_ret_var" "$f_result_"
+	setvar "$f_var" "${f_ret#$Newline}"
 }
 
 # Take all lines matching $2 (full line)
@@ -557,37 +544,60 @@ ensure_connected()
 	isnull "$r_name" || git config "remote.$r_name.gcrypt-id" "$r_repoid"
 }
 
-# $1 is the packline  pack :SHA256:abc1231..
-fetch_decrypt_pack()
+# $1 is the hash type (SHA256 etc)
+# $2 the pack id
+# $3 the key
+get_verify_decrypt_pack()
 {
-	local rcv_id= r_key= r_htype= r_pack=
-	splitcolon "${1#pack :}" @r_htype @r_pack
-
-	if isnoteq "$r_htype" SHA256 && isnoteq "$r_htype" SHA224 &&
-		isnoteq "$r_htype" SHA384 && isnoteq "$r_htype" SHA512
-	then
-		echo_die "Packline malformed: $1"
-	fi
-	GET "$URL" "$r_pack" "$TmpPack_Encrypted" &&
-	rcv_id=$(gpg_hash "$r_htype" < "$TmpPack_Encrypted") &&
-	iseq "$rcv_id" "$r_pack" ||
-		echo_die "Packfile $r_pack does not match digest!"
-	filter_to @r_key "pack :${r_htype}:$r_pack *" "$Packlist"
-	pick_fields @r_key 3 "$r_key"
-	DECRYPT "$r_key" < "$TmpPack_Encrypted"
+	local rcv_id= tmp_encrypted=
+	tmp_encrypted="$Localdir/tmp_pack_ENCRYPTED_.$$"
+	GET "$URL" "$2" "$tmp_encrypted" &&
+	rcv_id=$(gpg_hash "$1" < "$tmp_encrypted") &&
+	iseq "$rcv_id" "$2" || echo_die "Packfile $2 does not match digest!"
+	DECRYPT "$3" < "$tmp_encrypted"
+	rm -f "$tmp_encrypted"
 }
 
-# $1 is new pack id $2 key, $3, $4 return variables
-# set $3 to yes if repacked
-# $4 to list of packfiles to delete
+# download all packlines (pack :SHA256:a32abc1231) from stdin (or die)
+# $1 destdir (when repack, else "")
+get_pack_files()
+{
+	local pack_id= r_pack_key_line= r_htype= r_pack= key_=
+	while read -r _ pack_id # <<here-document
+	do
+		isnonnull "$pack_id" || continue
+
+		# Get the Packlist line with the key
+		filter_to @r_pack_key_line "pack $pack_id *" "$Packlist"
+		key_=${r_pack_key_line#pack "$pack_id" }
+
+		splitcolon "${pack_id#:}" @r_htype @r_pack
+		if isnonnull "${r_pack##$Hex40*}" ||
+			isnoteq "$r_htype" SHA256 && isnoteq "$r_htype" SHA224 &&
+			isnoteq "$r_htype" SHA384 && isnoteq "$r_htype" SHA512
+		then
+			echo_die "Packline malformed: $pack_id"
+		fi
+
+		get_verify_decrypt_pack "$r_htype" "$r_pack" "$key_" | \
+		if isnull "${1:-}"
+		then
+			# add to local pack list
+			git index-pack -v --stdin >/dev/null
+			xecho "pack $pack_id" >> "$Localdir/have_packs$GITCEPTION"
+		else
+			git index-pack -v --stdin "$1/${r_pack}.pack" >/dev/null
+		fi
+	done
+}
+
+# Download and unpack remote packfiles
+# $1 is objects tmpfile
+# $2 return var for list of packfiles to delete
 repack_if_needed()
 {
-	local pack_= packline_= premote_= key_= pkeep_= n_= m_= \
-		orig_ifs= kline_= r_line= r_list_new=
+	local n_= m_= kline_= r_line= r_keep_packlist= r_del_list=
 
-	# $TmpPack_Encrypted set in caller
-
-	setvar "$3" no
 	isnonnull "$Packlist" || return 0
 
 	if isnonnull "${GCRYPT_FULL_REPACK:-}"
@@ -596,63 +606,38 @@ repack_if_needed()
 		Repack_limit=1
 	fi
 
-	pick_fields @premote_ 1,2 "$Packlist"
-	pick_fields @pkeep_ 2 "$Keeplist"
+	pick_fields_1_2 @r_del_list "$Packlist"
 
 	n_=$(line_count "$Packlist")
-	m_=$(line_count "$pkeep_")
-	if [ "$Repack_limit" -gt "$(($n_ - $m_))" ]; then
+	m_=$(line_count "$Keeplist")
+	if iseq 0 "$(( $Repack_limit < ($n_ - $m_) ))"; then
 		return
 	fi
 	echo_info "Repacking remote $NAME, ..."
 
 	rm -r -f "$Localdir/pack"
 	mkdir -p "$Localdir/pack"
-	DECRYPT "$2" < "$TmpPack_Encrypted" |
-		git index-pack -v --stdin "$Localdir/pack/${1}.pack" >/dev/null
 
-	xecho "$premote_" | while read packline_
-	do
-		isnonnull "$packline_" || continue
-		if isnonnull "$pkeep_" &&
-			xecho "$packline_" | grep -q -e "$pkeep_"
-		then
-			continue
-		fi
-		pack_=${packline_#$Packpat}
-		fetch_decrypt_pack "$packline_" |
-		git index-pack -v --stdin "$Localdir/pack/${pack_}.pack" >/dev/null
-	done
-	key_=$(genkey "$Packkey_bytes")
-
-	git verify-pack -v "$Localdir"/pack/*.idx | grep -E '^[0-9a-f]{40}' |
-		cut -f 1 -d ' ' |
-		GIT_ALTERNATE_OBJECT_DIRECTORIES=$Localdir \
-		git pack-objects --stdout | ENCRYPT "$key_" > "$TmpPack_Encrypted"
-
-	# Truncate packlist to only the kept packs
-	if isnull "$pkeep_"; then
-		setvar "$4" "$premote_"
-		Packlist=
-	else
-		setvar "$4" "$(xecho "$premote_" | xgrep -v -e "$pkeep_")"
-		orig_ifs=$IFS
-		IFS=$Newline
-		for kline_ in $pkeep_
+	# Split packages to keep and to repack
+	if isnonnull "$Keeplist"; then
+		while read -r _ kline_ _ # <<here-document
 		do
-			IFS=$orig_ifs
+			isnonnull "$kline_" || continue
 			filter_to @r_line "pack $kline_ *" "$Packlist"
-			append_to @r_list_new "$r_line"
-		done
-		IFS=$orig_ifs
-		Packlist=$r_list_new
+			append_to @r_keep_packlist "$r_line"
+			filter_to ! @r_del_list "pack $kline_" "$r_del_list"
+		done <<EOF
+$Keeplist
+EOF
 	fi
 
-	pack_id=$(pack_hash < "$TmpPack_Encrypted")
-	append_to @Packlist "pack :${Hashtype}:$pack_id $key_"
-	append_to @Keeplist "keep :${Hashtype}:$pack_id 1"
-	rm -r -f "$Localdir/pack"
-	setvar "$3" yes
+	xecho "$r_del_list" | get_pack_files "$Localdir/pack/"
+
+	git verify-pack -v "$Localdir"/pack/*.idx | grep -E '^[0-9a-f]{40}' |
+		cut -f 1 -d ' ' >> "$1"
+
+	Packlist=$r_keep_packlist
+	setvar "$2" "$r_del_list"
 }
 
 do_capabilities()
@@ -685,23 +670,13 @@ do_list()
 
 do_fetch()
 {
-	# The PACK id is the hash of the encrypted git packfile.
-	# We only download packs mentioned in the encrypted manifest,
-	# and check their digest when received.
-	local pack_= packline_= pneed_= premote_=
+	# Download packs in the manifest that don't appear in have_packs
+	local pneed_= premote_=
 
 	ensure_connected
 
-	if isnull "$Packlist"
-	then
-		echo_git # end with blank line
-		return
-	fi
-
-	TmpPack_Encrypted="$Localdir/tmp_pack_ENCRYPTED_.$$"
-
 	# The `+` for $GITCEPTION is pointless but we will be safe for stacking
-	pick_fields @premote_ 1,2 "$Packlist"
+	pick_fields_1_2 @premote_ "$Packlist"
 	if [ -s "$Localdir/have_packs+" ]
 	then
 		pneed_=$(xecho "$premote_" | xgrep -v -x -f "$Localdir/have_packs+")
@@ -709,16 +684,8 @@ do_fetch()
 		pneed_=$premote_
 	fi
 
-	xecho "$pneed_" | while read packline_
-	do
-		isnonnull "$packline_" || continue
-		fetch_decrypt_pack "$packline_" |
-			git index-pack -v --stdin >/dev/null
-		# add to local pack list
-		xecho "${packline_}" >> "$Localdir/have_packs$GITCEPTION"
-	done
+	xecho "$pneed_" | get_pack_files
 
-	rm -f "$TmpPack_Encrypted"
 	echo_git # end with blank line
 }
 
@@ -729,8 +696,8 @@ do_push()
 	# Each git packfile is encrypted and then named for the encrypted
 	# file's hash. The manifest is updated with the pack id.
 	# The manifest is encrypted.
-	local r_revlist= line_= pack_id= key_= obj_= \
-		r_did_repack= r_pack_delete= r_src= r_dst= 
+	local r_revlist= line_= pack_id= r_pack_id= key_= obj_= \
+		r_pack_delete= r_src= r_dst= tmp_encrypted= tmp_objlist=
 
 	ensure_connected
 
@@ -763,25 +730,26 @@ do_push()
 $1
 EOF
 
-	TmpPack_Encrypted="$Localdir/tmp_pack_ENCRYPTED_.$$"
-	TmpObjlist="$Localdir/tmp_packrevlist.$$"
-	key_=$(genkey "$Packkey_bytes")
+	tmp_encrypted="$Localdir/tmp_pack_ENCRYPTED_.$$"
+	tmp_objlist="$Localdir/tmp_packrevlist.$$"
 
-	xecho "$r_revlist" | git rev-list --objects --stdin -- |
-		tee "$TmpObjlist" |
-		git pack-objects --stdout | ENCRYPT "$key_">"$TmpPack_Encrypted"
+	xecho "$r_revlist" | git rev-list --objects --stdin -- > "$tmp_objlist"
 	# Only send pack if we have any objects to send
-	if [ -s "$TmpObjlist" ]
+	if [ -s "$tmp_objlist" ]
 	then
-		pack_id=$(pack_hash < "$TmpPack_Encrypted")
-		repack_if_needed "$pack_id" "$key_" @r_did_repack @r_pack_delete
+		repack_if_needed "$tmp_objlist" @r_pack_delete
 
-		if isnoteq "$r_did_repack" yes
+		key_=$(genkey "$Packkey_bytes")
+		GIT_ALTERNATE_OBJECT_DIRECTORIES=$Localdir \
+			git pack-objects --stdout < "$tmp_objlist" |
+			ENCRYPT "$key_" > "$tmp_encrypted"
+		pack_id=$(pack_hash < "$tmp_encrypted")
+
+		append_to @Packlist "pack :${Hashtype}:$pack_id $key_"
+		if isnonnull "$r_pack_delete"
 		then
-			append_to @Packlist "pack :${Hashtype}:$pack_id $key_"
+			append_to @Keeplist "keep :${Hashtype}:$pack_id 1"
 		fi
-		# else, repack rewrote Packlist
-
 	fi
 
 	# Generate manifest
@@ -799,20 +767,21 @@ $Extnlist
 EOF
 
 	# Upload pack
-	if [ -s "$TmpObjlist" ]
+	if [ -s "$tmp_objlist" ]
 	then
-		PUT "$URL" "$pack_id" "$TmpPack_Encrypted"
+		PUT "$URL" "$pack_id" "$tmp_encrypted"
 	fi
 
 	# Upload manifest
 	PUT "$URL" "$Manifestfile" "$TmpManifest_Enc"
 
-	rm -f "$TmpPack_Encrypted"
-	rm -f "$TmpObjlist"
+	rm -f "$tmp_encrypted"
+	rm -f "$tmp_objlist"
 	rm -f "$TmpManifest_Enc"
 
 	# Delete packs
 	if isnonnull "$r_pack_delete"; then
+		rm -r -f "$Localdir/pack"
 		REMOVE "$URL" "$(xecho "$r_pack_delete" | while read packline_
 		do
 			isnonnull "$packline_" || continue
