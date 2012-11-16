@@ -1,8 +1,10 @@
 #!/bin/sh
 
 # git-remote-gcrypt
-# Copyright 2013  by Ulrik
-# License: GPLv2 or any later version, see http://www.gnu.org/licenses/
+#
+# git-remote-gcrypt is licensed under the terms of the GNU GPL version 3
+# (or at your option, version 2, or any version later than GPLv3).
+# See http://www.gnu.org/licenses/ for more information.
 #
 # See README
 
