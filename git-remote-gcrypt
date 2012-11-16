@@ -144,7 +144,7 @@ gitception_remove()
 
 gitception_new_repo()
 {
-	local empty_tree=4b825dc642cb6eb9a060e54bf8d69288fbee4904
+	local commit_id= empty_tree=4b825dc642cb6eb9a060e54bf8d69288fbee4904
 	# get any file to update Gref, and if it's not updated we create empty
 	git update-ref -d "$Gref" || :
 	gitception_get "$1" "x" 2>/dev/null >&2 || :
@@ -321,19 +321,15 @@ safe_git_rev_parse()
 
 make_new_repo()
 {
-	local urlid_= fix_config=
 	echo_info "Setting up new repository"
 	PUTREPO "$URL"
 
 	# Needed assumption: the same user should have no duplicate Repoid
 	Repoid=":id:$(genkey 15)"
-	iseq "${NAME#gcrypt::}" "$URL" || {
+	iseq "${NAME#gcrypt::}" "$URL" ||
 		git config "remote.$NAME.gcrypt-id" "$Repoid"
-		fix_config=1
-	}
 	echo_info "Remote ID is $Repoid"
 	Extension_list=$(xecho "extn comment")
-	#isnull "$fix_config" || echo_info "(configuration for $NAME updated)"
 }
 
 
@@ -383,7 +379,8 @@ read_config()
 
 	if isnull "$Recipients"
 	then
-		echo_info "You have not configured any keys to encrypt to for this repository"
+		echo_info "You have not configured any keys you can encrypt to" \
+			"for this repository"
 		echo_info "Use ::"
 		echo_info "  git config gcrypt.participants YOURKEYID"
 		exit 1
@@ -448,9 +445,8 @@ ensure_connected()
 	fi
 
 	Repoid=
-	isnull "$r_name" || {
+	isnull "$r_name" ||
 		Repoid=$(git config "remote.$r_name.gcrypt-id" || :)
-	}
 
 
 	TmpManifest_Enc="$Localdir/tmp_manifest.$$"
@@ -490,11 +486,10 @@ ensure_connected()
 		return 0
 	fi
 
-	isnull "$r_name" || {
-		git config "remote.$r_name.gcrypt-id" "$rcv_repoid"
-	}
+	isnull "$r_name" || git config "remote.$r_name.gcrypt-id" "$rcv_repoid"
 }
 
+# $1 is the packline  pack :SHA256:abc1231..
 fetch_decrypt_pack()
 {
 	local key_= rcv_id= htype_= pack_= hfunc_=
@@ -654,8 +649,9 @@ do_push()
 	# Each git packfile is encrypted and then named for the encrypted
 	# file's hash. The manifest is updated with the pack id.
 	# The manifest is encrypted.
-	local rev_list= src_= dst_= line_= pack_id= key_= obj_= pack_delete=
-	del_hash=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+	local rev_list= src_= dst_= line_= pack_id= key_= obj_= \
+		did_repack= pack_delete= \
+		del_hash=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 	ensure_connected
 
