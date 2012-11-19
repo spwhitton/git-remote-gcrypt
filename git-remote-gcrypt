@@ -531,8 +531,8 @@ ensure_connected()
 	rm -f "$TmpManifest_Enc"
 
 	filter_to @Refslist "$Hex40 *" "$manifest_"
-	filter_to @Packlist "pack *" "$manifest_"
-	filter_to @Keeplist "keep *" "$manifest_"
+	filter_to @Packlist "pack :*:* *" "$manifest_"
+	filter_to @Keeplist "keep :*:*" "$manifest_"
 	filter_to @Extnlist "extn *" "$manifest_"
 	filter_to @r_repoid "repo *" "$manifest_"
 
