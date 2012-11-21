@@ -25,7 +25,6 @@ Packlist=
 Keeplist=
 Extension_list=
 Repack_limit=25
-Packlist_delete=
 
 Recipients=
 Signers=
@@ -62,11 +61,18 @@ sort_stable_k2()
 
 tac() { sed '1!G;h;$!d'; }
 
-# Split $1 into $prefix_:$suffix_
+# setvar is used for named return variables
+# $1 *must* be a valid variable name, $2 is any value
+setvar()
+{
+	eval $1=\$2
+}
+
+# Split $1 into $2:$3
 splitcolon()
 {
-	prefix_=${1%%:*}
-	suffix_=${1#*:}
+	setvar "$2" "${1%%:*}"
+	setvar "$3" "${1#*:}"
 }
 repoidstr() { xecho "repo $Repoid"; }
 
@@ -477,9 +483,7 @@ ensure_connected()
 fetch_decrypt_pack()
 {
 	local key_= rcv_id= htype_= pack_= hfunc_=
-	splitcolon "${1#pack :}"
-	htype_=$prefix_
-	pack_=$suffix_
+	splitcolon "${1#pack :}" htype_ pack_
 
 	if isnoteq "$htype_" SHA256 && isnoteq "$htype_" SHA224 &&
 		isnoteq "$htype_" SHA384 && isnoteq "$htype_" SHA512
@@ -494,15 +498,16 @@ fetch_decrypt_pack()
 	DECRYPT "$key_" < "$TmpPack_Encrypted"
 }
 
-# $1 is new pack id $2 key
-# set did_repack=yes if repacked
+# $1 is new pack id $2 key, $3, $4 return variables
+# set $3 to yes if repacked
+# $4 to list of packfiles to delete
 repack_if_needed()
 {
 	local pack_= packline_= premote_= key_= pkeep_= n_=
 
 	# $TmpPack_Encrypted set in caller
 
-	did_repack=no
+	setvar "$3" no
 	isnonnull "$Packlist" || return 0
 
 	if isnonnull "$GCRYPT_FULL_REPACK"
@@ -550,10 +555,10 @@ repack_if_needed()
 
 	# Truncate packlist to only the kept packs
 	if isnull "$pkeep_"; then
-		Packlist_delete=$premote_
+		setvar "$4" "$premote_"
 		Packlist=
 	else
-		Packlist_delete=$(xecho "$premote_" | xgrep -v -e "$pkeep_")
+		setvar "$4" "$(xecho "$premote_" | xgrep -v -e "$pkeep_")"
 		Packlist=$(xecho "$Packlist" | xgrep -e "$pkeep_")
 	fi
 
@@ -561,7 +566,7 @@ repack_if_needed()
 	Packlist=$(append "$Packlist" "pack :${Hashtype}:$pack_id $key_")
 	Keeplist=$(append "$Keeplist" "keep :${Hashtype}:$pack_id 1")
 	rm -r -f "$Localdir/pack"
-	did_repack=yes
+	setvar "$3" yes
 }
 
 do_capabilities()
@@ -634,7 +639,8 @@ do_push()
 	# Each git packfile is encrypted and then named for the encrypted
 	# file's hash. The manifest is updated with the pack id.
 	# The manifest is encrypted.
-	local remote_has= remote_want= prefix_= suffix_= line_= pack_id= key_=
+	local remote_has= remote_want= src_= dst_= line_= pack_id= key_= obj_= \
+		pack_delete=
 	del_hash=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 	ensure_connected
@@ -654,16 +660,15 @@ do_push()
 	while read line_ # from <<
 	do
 		# +src:dst -- remove leading + then split at :
-		splitcolon "${line_#+}"
-		if isnonnull "$prefix_"
+		splitcolon "${line_#+}" src_ dst_
+		if isnonnull "$src_"
 		then
-			remote_want=$(append "$remote_want" "$prefix_")
-			Branchlist=$(append "$Branchlist" \
-			"$(xecho "$prefix_" | safe_git_rev_parse) $suffix_")
+			remote_want=$(append "$remote_want" "$src_")
+			obj_=$(xecho "$src_" | safe_git_rev_parse)
 		else
-			# Mark branch for deletion
-			Branchlist=$(append "$Branchlist" "$del_hash $suffix_")
+			obj_=$del_hash  # Mark for deletion
 		fi
+		Branchlist=$(append "$Branchlist" "$obj_ $dst_")
 	done <<EOF
 $1
 EOF
@@ -683,8 +688,7 @@ EOF
 	if [ -s "$TmpObjlist" ]
 	then
 		pack_id=$(pack_hash < "$TmpPack_Encrypted")
-		did_repack=
-		repack_if_needed "$pack_id" "$key_"
+		repack_if_needed "$pack_id" "$key_" did_repack pack_delete
 
 		if isnoteq "$did_repack" yes
 		then
@@ -716,8 +720,8 @@ EOF
 	PUT "$URL" "$Manifestfile" "$TmpManifest_Enc"
 
 	# Delete packs
-	if isnonnull "$Packlist_delete"; then
-		REMOVE "$URL" "$(xecho "$Packlist_delete" | while read packline_
+	if isnonnull "$pack_delete"; then
+		REMOVE "$URL" "$(xecho "$pack_delete" | while read packline_
 		do
 			isnonnull "$packline_" || continue
 			pack_=${packline_#$Packpat}
@@ -733,8 +737,8 @@ EOF
 	xecho "$1" | while read line_
 	do
 		# +src:dst -- remove leading + then split at :
-		splitcolon "${line_#+}"
-		echo_git "ok $suffix_"
+		splitcolon "${line_#+}" src_ dst_
+		echo_git "ok $dst_"
 	done
 	
 	echo_git 
