@@ -54,13 +54,6 @@ isurl() { isnull "${2%%$1://*}"; }
 islocalrepo() { isnull "${1##/*}" && [ ! -e "$1/HEAD" ]; }
 
 xgrep() { command grep "$@" || : ; }
-sort_C() { LC_ALL=C command sort "$@"; }
-sort_stable_k2()
-{
-	awk '{ printf("%08d\t%s\n", NR, $0) }' | sort_C -k 3,3 -k 1,1 |cut -f 2-
-}
-
-tac() { sed '1!G;h;$!d'; }
 
 # setvar is used for named return variables
 # $1 *must* be a valid variable name, $2 is any value
@@ -118,6 +111,21 @@ pick_fields()
 		append_to @f_result_ "${f_line_# }"
 	done
 	setvar "$f_ret_var" "$f_result_"
+}
+
+# Remove all lines matching $2 (full line)
+# $1 return variable name
+# $2 filter word
+# $3 input value
+filter_remove()
+{
+	local f_line= f_result_= IFS=
+	IFS=$Newline
+	for f_line in $3
+	do
+		isnull "${f_line##$2}" || append_to @f_result_ "$f_line"
+	done
+	setvar "$1" "$f_result_"
 }
 
 # Take all lines matching $2 (anchored front)
@@ -709,8 +717,7 @@ do_push()
 	# file's hash. The manifest is updated with the pack id.
 	# The manifest is encrypted.
 	local rev_list= src_= dst_= line_= pack_id= key_= obj_= \
-		did_repack= pack_delete= \
-		del_hash=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+		did_repack= pack_delete=
 
 	ensure_connected
 
@@ -730,20 +737,18 @@ do_push()
 	do
 		# +src:dst -- remove leading + then split at :
 		splitcolon "${line_#+}" @src_ @dst_
+
+		filter_remove @Branchlist "$Hex40 $dst_" "$Branchlist"
+
 		if isnonnull "$src_"
 		then
 			append_to @rev_list "$src_"
 			obj_=$(xecho "$src_" | safe_git_rev_parse)
-		else
-			obj_=$del_hash  # Mark for deletion
+			append_to @Branchlist "$obj_ $dst_"
 		fi
-		append_to @Branchlist "$obj_ $dst_"
 	done <<EOF
 $1
 EOF
-
-	Branchlist=$(xecho "$Branchlist" | sort_stable_k2 | tac | uniq -s 40 |
-		xgrep -v "^$del_hash")
 
 	TmpPack_Encrypted="$Localdir/tmp_pack_ENCRYPTED_.$$"
 	TmpObjlist="$Localdir/tmp_packrevlist.$$"
