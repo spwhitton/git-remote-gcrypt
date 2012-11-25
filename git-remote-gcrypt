@@ -584,8 +584,7 @@ get_pack_files()
 }
 
 # Download and unpack remote packfiles
-# $1 is objects tmpfile
-# $2 return var for list of packfiles to delete
+# $1 return var for list of packfiles to delete
 repack_if_needed()
 {
 	local n_= m_= kline_= r_line= r_keep_packlist= r_del_list=
@@ -627,10 +626,10 @@ EOF
 
 	(set +f; git verify-pack -v "$Localdir"/pack/*.idx ||
 	 echo_kill "git verify-pack failed!") |
-		grep -E '^[0-9a-f]{40}' | cut -f 1 -d ' ' >> "$1"
+		grep -E '^[0-9a-f]{40}' | cut -f 1 -d ' '
 
 	Packlist=$r_keep_packlist
-	setvar "$2" "$r_del_list"
+	setvar "$1" "$r_del_list"
 }
 
 do_capabilities()
@@ -724,12 +723,14 @@ EOF
 	tmp_encrypted=$(tempname packP)
 	tmp_objlist=$(tempname objlP)
 
-	xecho "$r_revlist" | git rev-list --objects --stdin -- > "$tmp_objlist"
+	{
+		xfeed "$r_revlist" git rev-list --objects --stdin --
+		repack_if_needed @r_pack_delete
+	} > "$tmp_objlist"
+
 	# Only send pack if we have any objects to send
 	if [ -s "$tmp_objlist" ]
 	then
-		repack_if_needed "$tmp_objlist" @r_pack_delete
-
 		key_=$(genkey "$Packkey_bytes")
 		(GIT_ALTERNATE_OBJECT_DIRECTORIES=$Localdir \
 			git pack-objects --stdout < "$tmp_objlist" ||
