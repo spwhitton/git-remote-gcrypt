@@ -167,7 +167,7 @@ Each item extends until newline, and matches one of the following:
     Packfile hash and its repack generation
 
 ``repo <id>``
-    The repository id
+    The remote id
 
 ``extn <name> ...``
     Extension field, preserved but unused.
