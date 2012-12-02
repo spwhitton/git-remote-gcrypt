@@ -27,8 +27,6 @@ Extension_list=
 Repack_limit=25
 
 Recipients=
-Signers=
-Goodsig=
 
 # compat/utility functions
 xecho()
@@ -272,15 +270,16 @@ PRIVENCRYPT()
 	addsignkeyparam gpg --compress-algo none -se $1
 }
 
+# $1 is the match for good signature, $2 is the textual signers list
 PRIVDECRYPT()
 {
 	local status_=
 	exec 4>&1 &&
 	status_=$(gpg  --status-fd 3 -q -d 3>&1 1>&4) &&
 	xecho "$status_" | grep "^\[GNUPG:\] ENC_TO " >/dev/null &&
-	(xecho "$status_" | grep -e "$Goodsig" >/dev/null || {
+	(xecho "$status_" | grep -e "$1" >/dev/null || {
 		echo_info "Failed to verify manifest signature!" &&
-		echo_info "Only accepting signatories: ${Signers:-(none)}" &&
+		echo_info "Only accepting signatories: ${2:-(none)}" &&
 		return 1
 	})
 }
@@ -327,9 +326,10 @@ make_new_repo()
 }
 
 
+# $1 return var for goodsig match, $2 return var for signers text
 read_config()
 {
-	local recp_= key_line= cap_= conf_keyring= conf_part=
+	local recp_= key_line= cap_= conf_keyring= conf_part= good_sig= signers_=
 	Conf_signkey=$(git config --path user.signingkey || :)
 	conf_keyring=$(git config --path gcrypt.keyring || :)
 	conf_part=$(git config --get "remote.$NAME.gcrypt-participants" '.+' ||
@@ -346,9 +346,11 @@ read_config()
 
 	if isnull "$conf_part" || iseq "$conf_part" simple
 	then
-		Signers="(default keyring)"
+		signers_="(default keyring)"
 		Recipients="--throw-keyids --default-recipient-self"
-		Goodsig="^\[GNUPG:\] GOODSIG "
+		good_sig="^\[GNUPG:\] GOODSIG "
+		setvar "$1" "$good_sig"
+		setvar "$2" "$signers_"
 		return 0
 	fi
 
@@ -358,8 +360,8 @@ read_config()
 		keyid_=$(xecho "$key_line" | cut -f 5 -d :)
 
 		isnonnull "$keyid_" &&
-		Signers="$Signers $keyid_" &&
-		Goodsig=$(append "$Goodsig" "^\[GNUPG:\] GOODSIG $keyid_") || {
+		signers_="$signers_ $keyid_" &&
+		good_sig=$(append "$good_sig" "^\[GNUPG:\] GOODSIG $keyid_") || {
 			echo_info "WARNING: Skipping missing key $recp_"
 			continue
 		}
@@ -375,18 +377,20 @@ read_config()
 		echo_info "  git config gcrypt.participants YOURKEYID"
 		exit 1
 	fi
+	setvar "$1" "$good_sig"
+	setvar "$2" "$signers_"
 }
 
 ensure_connected()
 {
-	local manifest_= rcv_repoid= r_name= url_frag=
+	local manifest_= rcv_repoid= r_name= url_frag= good_sig= signers_=
 
 	if isnonnull "$Did_find_repo"
 	then
 		return
 	fi
 	Did_find_repo=no
-	read_config
+	read_config good_sig signers_
 
 	iseq "${NAME#gcrypt::}" "$URL" || r_name=$NAME
 
@@ -446,7 +450,7 @@ ensure_connected()
 
 	Did_find_repo=yes
 	echo_info "Decrypting manifest"
-	manifest_=$(PRIVDECRYPT < "$TmpManifest_Enc") && 
+	manifest_=$(PRIVDECRYPT "$good_sig" "$signers_" < "$TmpManifest_Enc") &&
 		isnonnull "$manifest_" ||
 		echo_die "Failed to decrypt manifest!"
 	rm -f "$TmpManifest_Enc"
