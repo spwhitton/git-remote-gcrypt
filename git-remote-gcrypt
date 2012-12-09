@@ -19,6 +19,9 @@ Packkey_bytes=33  # 33 random bytes for passphrase, still compatible if changed
 Hashtype=SHA256   # SHA512 SHA384 SHA256 SHA224 supported.
 Packpat="pack :*:"
 Manifestfile=91bd0c092128cf2e60e1a608c31e92caf1f9c1595f83f2890ef17c0e4881aa0a
+Hex40="[a-f0-9]"
+Hex40=$Hex40$Hex40$Hex40$Hex40$Hex40$Hex40$Hex40$Hex40
+Hex40=$Hex40$Hex40$Hex40$Hex40$Hex40 # Match SHA-1 hexdigest
 
 Did_find_repo=  # yes for connected, no for no repo
 Repoid=
@@ -61,9 +64,11 @@ tac() { sed '1!G;h;$!d'; }
 
 # setvar is used for named return variables
 # $1 *must* be a valid variable name, $2 is any value
+# our convention: variable name requires @ prefix
 setvar()
 {
-	eval $1=\$2
+	isnull "${1##@*}" || echo_die "Missing @ for return variable: $1"
+	eval ${1#@}=\$2
 }
 
 Newline="
@@ -72,10 +77,10 @@ Newline="
 # $1 is return var, $2 is value appended with newline separator
 append_to()
 {
-	local tmp_=
-	eval tmp_=\$$1
-	isnull "$tmp_" || tmp_=$tmp_$Newline
-	setvar "$1" "$tmp_$2"
+	local append_tmp_=
+	eval append_tmp_=\$${1#@}
+	isnull "$append_tmp_" || append_tmp_=$append_tmp_$Newline
+	setvar "$1" "$append_tmp_$2"
 }
 
 # Split $1 into $2:$3
@@ -84,6 +89,52 @@ splitcolon()
 	setvar "$2" "${1%%:*}"
 	setvar "$3" "${1#*:}"
 }
+
+# if $1 contains $2
+contains()
+{
+	isnull "${1##*"$2"*}"
+}
+
+# Pick words from each line
+# $1 return variable name
+# $2 field list "1,2,3"
+# $3 input value
+pick_fields()
+{
+	local f_line_= f_result_= f_mask_= f_ret_var= f_oifs="$IFS" IFS=
+	f_ret_var=$1
+	f_mask_=$2
+	IFS=$Newline
+	for f_line_ in $3
+	do
+		IFS=$f_oifs
+		# split $f_line_ into words and pick them out
+		set -- $f_line_
+		f_line_=
+		! contains "$f_mask_" 1 || f_line_=${1:-}
+		! contains "$f_mask_" 2 || f_line_="$f_line_ ${2:-}"
+		! contains "$f_mask_" 3 || f_line_="$f_line_ ${3:-}"
+		append_to @f_result_ "${f_line_# }"
+	done
+	setvar "$f_ret_var" "$f_result_"
+}
+
+# Take all lines matching $2 (anchored front)
+# $1 return variable name
+# $2 filter word
+# $3 input value
+filter_to()
+{
+	local f_line= f_result_= IFS=
+	IFS=$Newline
+	for f_line in $3
+	do
+		iseq "$f_line" "${f_line#$2}" || append_to @f_result_ "$f_line"
+	done
+	setvar "$1" "$f_result_"
+}
+
 
 ## gitception part
 # Fetch giturl $1, file $2
@@ -371,7 +422,7 @@ read_config()
 
 		isnonnull "$keyid_" &&
 		signers_="$signers_ $keyid_" &&
-		append_to good_sig "^\[GNUPG:\] GOODSIG $keyid_" || {
+		append_to @good_sig "^\[GNUPG:\] GOODSIG $keyid_" || {
 			echo_info "WARNING: Skipping missing key $recp_"
 			continue
 		}
@@ -401,7 +452,7 @@ ensure_connected()
 		return
 	fi
 	Did_find_repo=no
-	read_config sig_match signer_text
+	read_config @sig_match @signer_text
 
 	iseq "${NAME#gcrypt::}" "$URL" || r_name=$NAME
 
@@ -465,11 +516,11 @@ ensure_connected()
 		echo_die "Failed to decrypt manifest!"
 	rm -f "$TmpManifest_Enc"
 
-	Branchlist=$(xecho "$manifest_" | xgrep -E '^[0-9a-f]{40} ')
-	Packlist=$(xecho "$manifest_" | xgrep "^pack ")
-	Keeplist=$(xecho "$manifest_" | xgrep "^keep ")
-	Extension_list=$(xecho "$manifest_" | xgrep "^extn ")
-	rcv_repoid=$(xecho "$manifest_" | xgrep "^repo ")
+	filter_to @Packlist "pack " "$manifest_"
+	filter_to @Keeplist "keep " "$manifest_"
+	filter_to @Extension_list "extn " "$manifest_"
+	filter_to @rcv_repoid "repo " "$manifest_"
+	filter_to @Branchlist "$Hex40 " "$manifest_"
 
 	rcv_repoid=${rcv_repoid#repo }
 	rcv_repoid=${rcv_repoid% *}
@@ -496,7 +547,7 @@ ensure_connected()
 fetch_decrypt_pack()
 {
 	local key_= rcv_id= htype_= pack_= hfunc_=
-	splitcolon "${1#pack :}" htype_ pack_
+	splitcolon "${1#pack :}" @htype_ @pack_
 
 	if isnoteq "$htype_" SHA256 && isnoteq "$htype_" SHA224 &&
 		isnoteq "$htype_" SHA384 && isnoteq "$htype_" SHA512
@@ -507,7 +558,8 @@ fetch_decrypt_pack()
 	rcv_id=$(gpg_hash "$htype_" < "$TmpPack_Encrypted") &&
 	iseq "$rcv_id" "$pack_" ||
 		echo_die "Packfile $pack_ does not match digest!"
-	key_=$(xecho "$Packlist" | grep "$pack_" | cut -f 3 -d ' ')
+	filter_to @key_ "pack :${htype_}:$pack_" "$Packlist"
+	pick_fields @key_ 3 "$key_"
 	DECRYPT "$key_" < "$TmpPack_Encrypted"
 }
 
@@ -529,8 +581,8 @@ repack_if_needed()
 		Repack_limit=1
 	fi
 
-	premote_=$(xecho "$Packlist" | cut -f 1-2 -d ' ')
-	pkeep_=$(xecho "$Keeplist" | cut -f 2 -d ' ')
+	pick_fields @premote_ 1,2 "$Packlist"
+	pick_fields @pkeep_ 2 "$Keeplist"
 
 	if isnull "$pkeep_"; then
 		n_=$(xecho "$Packlist" | wc -l)
@@ -576,8 +628,8 @@ repack_if_needed()
 	fi
 
 	pack_id=$(pack_hash < "$TmpPack_Encrypted")
-	append_to Packlist "pack :${Hashtype}:$pack_id $key_"
-	append_to Keeplist "keep :${Hashtype}:$pack_id 1"
+	append_to @Packlist "pack :${Hashtype}:$pack_id $key_"
+	append_to @Keeplist "keep :${Hashtype}:$pack_id 1"
 	rm -r -f "$Localdir/pack"
 	setvar "$3" yes
 }
@@ -628,7 +680,7 @@ do_fetch()
 	TmpPack_Encrypted="$Localdir/tmp_pack_ENCRYPTED_.$$"
 
 	# The `+` for $GITCEPTION is pointless but we will be safe for stacking
-	premote_=$(xecho "$Packlist" | cut -f 1-2 -d ' ')
+	pick_fields @premote_ 1,2 "$Packlist"
 	if [ -s "$Localdir/have_packs+" ]
 	then
 		pneed_="$(xecho "$premote_" | xgrep -v -x -f "$Localdir/have_packs+")"
@@ -677,15 +729,15 @@ do_push()
 	while read line_ # from <<
 	do
 		# +src:dst -- remove leading + then split at :
-		splitcolon "${line_#+}" src_ dst_
+		splitcolon "${line_#+}" @src_ @dst_
 		if isnonnull "$src_"
 		then
-			append_to rev_list "$src_"
+			append_to @rev_list "$src_"
 			obj_=$(xecho "$src_" | safe_git_rev_parse)
 		else
 			obj_=$del_hash  # Mark for deletion
 		fi
-		append_to Branchlist "$obj_ $dst_"
+		append_to @Branchlist "$obj_ $dst_"
 	done <<EOF
 $1
 EOF
@@ -704,11 +756,11 @@ EOF
 	if [ -s "$TmpObjlist" ]
 	then
 		pack_id=$(pack_hash < "$TmpPack_Encrypted")
-		repack_if_needed "$pack_id" "$key_" did_repack pack_delete
+		repack_if_needed "$pack_id" "$key_" @did_repack @pack_delete
 
 		if isnoteq "$did_repack" yes
 		then
-			append_to Packlist "pack :${Hashtype}:$pack_id $key_"
+			append_to @Packlist "pack :${Hashtype}:$pack_id $key_"
 		fi
 		# else, repack rewrote Packlist
 
@@ -757,7 +809,7 @@ EOF
 	xecho "$1" | while read line_
 	do
 		# +src:dst -- remove leading + then split at :
-		splitcolon "${line_#+}" src_ dst_
+		splitcolon "${line_#+}" @src_ @dst_
 		echo_git "ok $dst_"
 	done
 	
@@ -812,7 +864,7 @@ gcrypt_main_loop()
 			do
 				case "$input_inner" in
 				push\ *)
-					append_to args_ "${input_inner#push }"
+					append_to @args_ "${input_inner#push }"
 				;;
 				*)
 					break
