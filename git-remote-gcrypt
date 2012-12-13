@@ -761,12 +761,17 @@ EOF
 	echo_git 
 }
 
+cleanup_atexit()
+{
+	rm -f "$Localdir"/tmp_*".$$" >&2
+}
+
 NAME=$1  # Remote name
 URL=$2   # Remote URL
 
 mkdir -p "$Localdir"
+trap cleanup_atexit EXIT 1 2 3 15
 
-trap 'rm -f "$Localdir/tmp_"*".$$"' EXIT 1 2 3 15
 echo_info "Development version -- Repository format MAY CHANGE"
 
 while read Input
