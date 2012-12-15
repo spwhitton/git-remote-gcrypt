@@ -6,8 +6,8 @@
 #
 # See README
 
-#set -x
 set -e
+set -u
 
 Did_find_repo=  # yes for connected, no for no repo
 Localdir="${GIT_DIR:=.git}/remote-gcrypt"
@@ -514,7 +514,7 @@ repack_if_needed()
 	setvar "$3" no
 	isnonnull "$Packlist" || return 0
 
-	if isnonnull "$GCRYPT_FULL_REPACK"
+	if isnonnull "${GCRYPT_FULL_REPACK:-}"
 	then
 		Keeplist=
 		Repack_limit=1
