@@ -19,7 +19,6 @@ Packkey_bytes=33  # 33 random bytes for passphrase, still compatible if changed
 Hashtype=SHA256   # SHA512 SHA384 SHA256 SHA224 supported.
 Packpat="pack :*:"
 Manifestfile=91bd0c092128cf2e60e1a608c31e92caf1f9c1595f83f2890ef17c0e4881aa0a
-Urlfrag=
 
 Branchlist=
 Packlist=
@@ -78,7 +77,7 @@ gitception_get()
 	# Take care to preserve FETCH_HEAD
 	local ret_=: obj_id= f_head="$GIT_DIR/FETCH_HEAD"
 	[ -e "$f_head" ] && command mv -f "$f_head" "$f_head.$$~" || :
-	git fetch -q -f "$1" "refs/heads/${Urlfrag:-master}:$Gref" 2>/dev/tty >/dev/null &&
+	git fetch -q -f "$1" "$Gref_rbranch:$Gref" 2>/dev/tty >/dev/null &&
 		obj_id="$(git ls-tree "$Gref" | xgrep -E '\b'"$2"'$' | awk '{print $3}')" &&
 		isnonnull "$obj_id" && git cat-file blob "$obj_id" && ret_=: ||
 		{ ret_=false && : ; }
@@ -181,8 +180,7 @@ PUT_FINAL()
 	then
 		:
 	else
-		git push --quiet -f "${1#gitception://}" \
-			"$Gref:refs/heads/${Urlfrag:-master}"
+		git push --quiet -f "${1#gitception://}" "$Gref:$Gref_rbranch"
 	fi
 }
 
@@ -375,7 +373,7 @@ read_config()
 
 ensure_connected()
 {
-	local manifest_= rcv_repoid= r_name=
+	local manifest_= rcv_repoid= r_name= url_frag=
 
 	if isnonnull "$Did_find_repo"
 	then
@@ -400,29 +398,32 @@ ensure_connected()
 	fi
 
 	# Find the URL fragment
-	Urlfrag=${URL##*"#"}
-	isnoteq "$Urlfrag" "$URL" || Urlfrag=
-	isnonnull "$Urlfrag" || {
+	url_frag=${URL##*"#"}
+	isnoteq "$url_frag" "$URL" || url_frag=
+	isnonnull "$url_frag" || {
 		# find old style  /G.XXXXXX fragment
-		Urlfrag=${URL##*/G.}
-		if isnoteq "$Urlfrag" "$URL"; then
-			URL=${URL%/G."$Urlfrag"}
+		url_frag=${URL##*/G.}
+		if isnoteq "$url_frag" "$URL"; then
+			URL=${URL%/G."$url_frag"}
 			isnull "$r_name" || {
 				git config "remote.$r_name.url" \
-					"gcrypt::$URL#$Urlfrag"
+					"gcrypt::$URL#$url_frag"
 				echo_info "Updated URL for $r_name, use #fragment"
 			}
 		else
-			Urlfrag=
+			url_frag=
 		fi
 	}
-	URL=${URL%"#$Urlfrag"}
+	URL=${URL%"#$url_frag"}
 
 	# manifestfile -- sha224 hash if we can, else the default location
 	if isurl sftp "$URL" || islocalrepo "$URL" || isurl rsync "$URL"
 	then
 		# not for gitception
-	isnull "$Urlfrag" || Manifestfile=$(xecho_n "$Urlfrag" | gpg_hash SHA224)
+		isnull "$url_frag" ||
+			Manifestfile=$(xecho_n "$url_frag" | gpg_hash SHA224)
+	else
+		isnull "$url_frag" || Gref_rbranch="refs/heads/$url_frag"
 	fi
 
 	Repoid=
