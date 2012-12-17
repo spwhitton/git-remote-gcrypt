@@ -143,6 +143,18 @@ filter_to()
 	setvar "$1" "$f_result_"
 }
 
+# Output the number of lines in $1
+line_count()
+{
+	local f_x=0 IFS=
+	IFS=$Newline
+	for f_line in $1
+	do
+		f_x=$(($f_x + 1))
+	done
+	xecho "$f_x"
+}
+
 
 ## gitception part
 # Fetch giturl $1, file $2
@@ -577,7 +589,7 @@ fetch_decrypt_pack()
 # $4 to list of packfiles to delete
 repack_if_needed()
 {
-	local pack_= packline_= premote_= key_= pkeep_= n_=
+	local pack_= packline_= premote_= key_= pkeep_= n_= m_=
 
 	# $TmpPack_Encrypted set in caller
 
@@ -593,12 +605,9 @@ repack_if_needed()
 	pick_fields @premote_ 1,2 "$Packlist"
 	pick_fields @pkeep_ 2 "$Keeplist"
 
-	if isnull "$pkeep_"; then
-		n_=$(xecho "$Packlist" | wc -l)
-	else
-		n_=$(xecho "$Packlist" | grep -v -e "$pkeep_" | wc -l)
-	fi
-	if [ $Repack_limit -gt "$n_" ]; then
+	n_=$(line_count "$Packlist")
+	m_=$(line_count "$pkeep_")
+	if [ $Repack_limit -gt "$(($n_ - $m_))" ]; then
 		return
 	fi
 	echo_info "Repacking remote $NAME, ..."
