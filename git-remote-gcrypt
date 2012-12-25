@@ -581,7 +581,7 @@ repack_if_needed()
 	if isnonnull "${GCRYPT_FULL_REPACK:-}"
 	then
 		Keeplist=
-		Repack_limit=1
+		Repack_limit=0
 	fi
 
 	pick_fields_1_2 @r_del_list "$Packlist"
