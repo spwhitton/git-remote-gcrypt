@@ -120,37 +120,28 @@ Remote ID
 Repository Format
 .................
 
-``EncSign(X)``
-    Sign and Encrypt to GPG key holder
-``Encrypt(K,X)``
-    Encrypt using symmetric-key algorithm
-``Hash(X)``
-    SHA-2/256
-
-``B``
-    branch list
-``L``
-    list of the hash (``Hi``) and key (``Ki``) for each packfile
-``R``
-    Remote ID
-
+| `EncSign(X):`   Sign and Encrypt to GPG key holder
+| `Encrypt(K,X):` Encrypt using symmetric-key algorithm
+| `Hash(X):`      SHA-2/256
+|
+| `B:` branch list
+| `L:` list of the hash (`Hi`) and key (`Ki`) for each packfile
+| `R:` Remote ID
 |
 | To write the repository:
 |
-| Store each packfile ``P`` as ``Encrypt(Ki, P) -> P'`` in filename ``Hi``
-|   where ``Ki`` is a new random string and ``Hash(P') -> Hi``
-| Store ``EncSign(B || L || R)`` in the manifest
+| Store each packfile `P` as `Encrypt(Ki, P)` → `P'` in filename `Hi`
+|   where `Ki` is a new random string and `Hash(P')` → `Hi`
+| Store `EncSign(B || L || R)` in the manifest
 |
 | To read the repository:
 |
-| Decrypt and verify manifest using GPG keyring ``-> (B, L, R)``
-| Warn if ``R`` does not match previously seen Remote ID
-| for each ``Hi, Ki in L``:
-|   Get file ``Hi`` from the server ``-> P'``
-|   Verify ``Hash(P')`` matches ``Hi``
-|   Decrypt ``P'`` using ``Ki`` -> ``P`` then open ``P`` with git
-|
-| Only packs mentioned in ``L`` are downloaded.
+| Get manifest, decrypt and verify using GPG keyring → `(B, L, R)`
+| Warn if `R` does not match previously seen Remote ID
+| for each `Hi, Ki` in `L`:
+|   Get file `Hi` from the server → `P'`
+|   Verify `Hash(P')` matches `Hi`
+|   Decrypt `P'` using `Ki` → `P` then open `P` with git
 
 Manifest file
 .............
