@@ -423,7 +423,7 @@ read_config()
 	for recp_ in $conf_part
 	do
 		key_line=$(gpg --with-colons --fast-list -k "$recp_" | xgrep ^pub)
-		isnonnull "${key_line##*"$Newline"*}" ||
+		isnull "$key_line" || isnonnull "${key_line##*"$Newline"*}" ||
 		echo_info "WARNING: '$recp_' matches multiple keys, using one"
 		key_line=${key_line%%"$Newline"*}
 		keyid_=$(xecho "$key_line" | cut -f 5 -d :)
