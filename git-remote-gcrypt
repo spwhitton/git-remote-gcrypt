@@ -57,7 +57,11 @@ xgrep() { command grep "$@" || : ; }
 
 # setvar is used for named return variables
 # $1 *must* be a valid variable name, $2 is any value
-# our convention: variable name requires @ prefix
+#
+# Conventions
+#   return variable names are passed with a @ prefix
+#   return variable functions use f_ prefix local vars
+#   return var consumers use r_ prefix vars (or Titlecase globals)
 setvar()
 {
 	isnull "${1##@*}" || echo_die "Missing @ for return variable: $1"
@@ -70,10 +74,10 @@ Newline="
 # $1 is return var, $2 is value appended with newline separator
 append_to()
 {
-	local append_tmp_=
-	eval append_tmp_=\$${1#@}
-	isnull "$append_tmp_" || append_tmp_=$append_tmp_$Newline
-	setvar "$1" "$append_tmp_$2"
+	local f_append_tmp_=
+	eval f_append_tmp_=\$${1#@}
+	isnull "$f_append_tmp_" || f_append_tmp_=$f_append_tmp_$Newline
+	setvar "$1" "$f_append_tmp_$2"
 }
 
 # Split $1 into $2:$3
@@ -161,13 +165,13 @@ line_count()
 gitception_get()
 {
 	# Take care to preserve FETCH_HEAD
-	local ret_=: obj_id= f_head="$GIT_DIR/FETCH_HEAD"
-	[ -e "$f_head" ] && command mv -f "$f_head" "$f_head.$$~" || :
+	local ret_=: obj_id= fet_head="$GIT_DIR/FETCH_HEAD"
+	[ -e "$fet_head" ] && command mv -f "$fet_head" "$fet_head.$$~" || :
 	git fetch -q -f "$1" "$Gref_rbranch:$Gref" >/dev/null &&
 		obj_id="$(git ls-tree "$Gref" | xgrep -E '\b'"$2"'$' | awk '{print $3}')" &&
 		isnonnull "$obj_id" && git cat-file blob "$obj_id" && ret_=: ||
 		{ ret_=false && : ; }
-	[ -e "$f_head.$$~" ] && command mv -f "$f_head.$$~" "$f_head" || :
+	[ -e "$fet_head.$$~" ] && command mv -f "$fet_head.$$~" "$fet_head" || :
 	$ret_
 }
 
@@ -407,7 +411,7 @@ make_new_repo()
 # $1 return var for goodsig match, $2 return var for signers text
 read_config()
 {
-	local recp_= key_line= cap_= conf_keyring= conf_part= good_sig= signers_=
+	local recp_= r_keyinfo= cap_= conf_keyring= conf_part= good_sig= signers_=
 	Conf_signkey=$(git config --path user.signingkey || :)
 	conf_keyring=$(git config --path gcrypt.keyring || :)
 	conf_part=$(git config --get "remote.$NAME.gcrypt-participants" '.+' ||
@@ -434,12 +438,12 @@ read_config()
 
 	for recp_ in $conf_part
 	do
-		filter_to @key_line "pub" \
+		filter_to @r_keyinfo "pub" \
 			"$(gpg --with-colons --fast-list -k "$recp_")"
-		isnull "$key_line" || isnonnull "${key_line##*"$Newline"*}" ||
+		isnull "$r_keyinfo" || isnonnull "${r_keyinfo##*"$Newline"*}" ||
 		echo_info "WARNING: '$recp_' matches multiple keys, using one"
-		key_line=${key_line%%"$Newline"*}
-		keyid_=$(xecho "$key_line" | cut -f 5 -d :)
+		r_keyinfo=${r_keyinfo%%"$Newline"*}
+		keyid_=$(xecho "$r_keyinfo" | cut -f 5 -d :)
 
 		isnonnull "$keyid_" &&
 		signers_="$signers_ $keyid_" &&
@@ -448,7 +452,7 @@ read_config()
 			continue
 		}
 		# Check 'E'ncrypt capability
-		cap_=$(xecho "$key_line" | cut -f 12 -d :)
+		cap_=$(xecho "$r_keyinfo" | cut -f 12 -d :)
 		iseq "${cap_#*E}" "$cap_" || Recipients="$Recipients -R $keyid_"
 	done
 
@@ -466,14 +470,14 @@ read_config()
 
 ensure_connected()
 {
-	local manifest_= rcv_repoid= r_name= url_frag= sig_match= signer_text=
+	local manifest_= r_repoid= r_name= url_frag= r_sigmatch= r_signers=
 
 	if isnonnull "$Did_find_repo"
 	then
 		return
 	fi
 	Did_find_repo=no
-	read_config @sig_match @signer_text
+	read_config @r_sigmatch @r_signers
 
 	iseq "${NAME#gcrypt::}" "$URL" || r_name=$NAME
 
@@ -532,7 +536,7 @@ ensure_connected()
 
 	Did_find_repo=yes
 	echo_info "Decrypting manifest"
-	manifest_=$(PRIVDECRYPT "$sig_match" "$signer_text" < "$TmpManifest_Enc") &&
+	manifest_=$(PRIVDECRYPT "$r_sigmatch" "$r_signers" < "$TmpManifest_Enc") &&
 		isnonnull "$manifest_" ||
 		echo_die "Failed to decrypt manifest!"
 	rm -f "$TmpManifest_Enc"
@@ -540,48 +544,48 @@ ensure_connected()
 	filter_to @Packlist "pack " "$manifest_"
 	filter_to @Keeplist "keep " "$manifest_"
 	filter_to @Extension_list "extn " "$manifest_"
-	filter_to @rcv_repoid "repo " "$manifest_"
+	filter_to @r_repoid "repo " "$manifest_"
 	filter_to @Branchlist "$Hex40 " "$manifest_"
 
-	rcv_repoid=${rcv_repoid#repo }
-	rcv_repoid=${rcv_repoid% *}
+	r_repoid=${r_repoid#repo }
+	r_repoid=${r_repoid% *}
 	if isnull "$Repoid"
 	then
-		echo_info "Remote ID is $rcv_repoid"
-		Repoid=$rcv_repoid
-	elif isnoteq "$rcv_repoid" "$Repoid"
+		echo_info "Remote ID is $r_repoid"
+		Repoid=$r_repoid
+	elif isnoteq "$r_repoid" "$Repoid"
 	then
 		echo_info "WARNING:"
 		echo_info "WARNING: Remote ID has changed!"
 		echo_info "WARNING: from $Repoid"
-		echo_info "WARNING: to   $rcv_repoid"
+		echo_info "WARNING: to   $r_repoid"
 		echo_info "WARNING:"
-		Repoid=$rcv_repoid
+		Repoid=$r_repoid
 	else
 		return 0
 	fi
 
-	isnull "$r_name" || git config "remote.$r_name.gcrypt-id" "$rcv_repoid"
+	isnull "$r_name" || git config "remote.$r_name.gcrypt-id" "$r_repoid"
 }
 
 # $1 is the packline  pack :SHA256:abc1231..
 fetch_decrypt_pack()
 {
-	local key_= rcv_id= htype_= pack_= hfunc_=
-	splitcolon "${1#pack :}" @htype_ @pack_
+	local rcv_id= r_key= r_htype= r_pack=
+	splitcolon "${1#pack :}" @r_htype @r_pack
 
-	if isnoteq "$htype_" SHA256 && isnoteq "$htype_" SHA224 &&
-		isnoteq "$htype_" SHA384 && isnoteq "$htype_" SHA512
+	if isnoteq "$r_htype" SHA256 && isnoteq "$r_htype" SHA224 &&
+		isnoteq "$r_htype" SHA384 && isnoteq "$r_htype" SHA512
 	then
 		echo_die "Packline malformed: $1"
 	fi
-	GET "$URL" "$pack_" "$TmpPack_Encrypted" &&
-	rcv_id=$(gpg_hash "$htype_" < "$TmpPack_Encrypted") &&
-	iseq "$rcv_id" "$pack_" ||
-		echo_die "Packfile $pack_ does not match digest!"
-	filter_to @key_ "pack :${htype_}:$pack_" "$Packlist"
-	pick_fields @key_ 3 "$key_"
-	DECRYPT "$key_" < "$TmpPack_Encrypted"
+	GET "$URL" "$r_pack" "$TmpPack_Encrypted" &&
+	rcv_id=$(gpg_hash "$r_htype" < "$TmpPack_Encrypted") &&
+	iseq "$rcv_id" "$r_pack" ||
+		echo_die "Packfile $r_pack does not match digest!"
+	filter_to @r_key "pack :${r_htype}:$r_pack" "$Packlist"
+	pick_fields @r_key 3 "$r_key"
+	DECRYPT "$r_key" < "$TmpPack_Encrypted"
 }
 
 # $1 is new pack id $2 key, $3, $4 return variables
@@ -590,7 +594,7 @@ fetch_decrypt_pack()
 repack_if_needed()
 {
 	local pack_= packline_= premote_= key_= pkeep_= n_= m_= \
-		orig_ifs= kline_= pline_= plist_new=
+		orig_ifs= kline_= r_line= r_list_new=
 
 	# $TmpPack_Encrypted set in caller
 
@@ -648,11 +652,11 @@ repack_if_needed()
 		for kline_ in $pkeep_
 		do
 			IFS=$orig_ifs
-			filter_to @pline_ "pack $kline_ " "$Packlist"
-			append_to @plist_new "$pline_"
+			filter_to @r_line "pack $kline_ " "$Packlist"
+			append_to @r_list_new "$r_line"
 		done
 		IFS=$orig_ifs
-		Packlist=$plist_new
+		Packlist=$r_list_new
 	fi
 
 	pack_id=$(pack_hash < "$TmpPack_Encrypted")
@@ -736,8 +740,8 @@ do_push()
 	# Each git packfile is encrypted and then named for the encrypted
 	# file's hash. The manifest is updated with the pack id.
 	# The manifest is encrypted.
-	local rev_list= src_= dst_= line_= pack_id= key_= obj_= \
-		did_repack= pack_delete=
+	local r_revlist= line_= pack_id= key_= obj_= \
+		r_did_repack= r_pack_delete= r_src= r_dst= 
 
 	ensure_connected
 
@@ -749,22 +753,22 @@ do_push()
 	if isnonnull "$Branchlist"
 	then
 		# mark all remote refs with  ^<sha-1> (if sha-1 exists locally)
-		rev_list=$(xecho "$Branchlist" | cut -f 1 -d ' ' |
+		r_revlist=$(xecho "$Branchlist" | cut -f 1 -d ' ' |
 			safe_git_rev_parse | sed -e 's/^\(.\)/^&/')
 	fi
 
 	while read line_ # from <<
 	do
 		# +src:dst -- remove leading + then split at :
-		splitcolon "${line_#+}" @src_ @dst_
+		splitcolon "${line_#+}" @r_src @r_dst
 
-		filter_remove @Branchlist "$Hex40 $dst_" "$Branchlist"
+		filter_remove @Branchlist "$Hex40 $r_dst" "$Branchlist"
 
-		if isnonnull "$src_"
+		if isnonnull "$r_src"
 		then
-			append_to @rev_list "$src_"
-			obj_=$(xecho "$src_" | safe_git_rev_parse)
-			append_to @Branchlist "$obj_ $dst_"
+			append_to @r_revlist "$r_src"
+			obj_=$(xecho "$r_src" | safe_git_rev_parse)
+			append_to @Branchlist "$obj_ $r_dst"
 		fi
 	done <<EOF
 $1
@@ -774,16 +778,16 @@ EOF
 	TmpObjlist="$Localdir/tmp_packrevlist.$$"
 	key_=$(genkey "$Packkey_bytes")
 
-	xecho "$rev_list" | git rev-list --objects --stdin -- |
+	xecho "$r_revlist" | git rev-list --objects --stdin -- |
 		tee "$TmpObjlist" |
 		git pack-objects --stdout | ENCRYPT "$key_">"$TmpPack_Encrypted"
 	# Only send pack if we have any objects to send
 	if [ -s "$TmpObjlist" ]
 	then
 		pack_id=$(pack_hash < "$TmpPack_Encrypted")
-		repack_if_needed "$pack_id" "$key_" @did_repack @pack_delete
+		repack_if_needed "$pack_id" "$key_" @r_did_repack @r_pack_delete
 
-		if isnoteq "$did_repack" yes
+		if isnoteq "$r_did_repack" yes
 		then
 			append_to @Packlist "pack :${Hashtype}:$pack_id $key_"
 		fi
@@ -819,8 +823,8 @@ EOF
 	rm -f "$TmpManifest_Enc"
 
 	# Delete packs
-	if isnonnull "$pack_delete"; then
-		REMOVE "$URL" "$(xecho "$pack_delete" | while read packline_
+	if isnonnull "$r_pack_delete"; then
+		REMOVE "$URL" "$(xecho "$r_pack_delete" | while read packline_
 		do
 			isnonnull "$packline_" || continue
 			pack_=${packline_#$Packpat}
@@ -834,8 +838,8 @@ EOF
 	xecho "$1" | while read line_
 	do
 		# +src:dst -- remove leading + then split at :
-		splitcolon "${line_#+}" @src_ @dst_
-		echo_git "ok $dst_"
+		splitcolon "${line_#+}" @r_src @r_dst
+		echo_git "ok $r_dst"
 	done
 	
 	echo_git 
@@ -849,7 +853,7 @@ cleanup_atexit()
 # handle git-remote-helpers protocol
 gcrypt_main_loop()
 {
-	local input_= input_inner= args_=
+	local input_= input_inner= r_args=
 
 	NAME=$1  # Remote name
 	URL=$2   # Remote URL
@@ -869,34 +873,34 @@ gcrypt_main_loop()
 			do_list
 			;;
 		fetch\ *)
-			args_="${input_##fetch }"
+			r_args="${input_##fetch }"
 			while read input_inner
 			do
 				case "$input_inner" in
 				fetch*)
-				args_= #ignored
+				r_args= #ignored
 				;;
 				*)
 				break
 				;;
 				esac
 			done
-			do_fetch "$args_"
+			do_fetch "$r_args"
 			;;
 		push\ *)
-			args_="${input_##push }"
+			r_args="${input_##push }"
 			while read input_inner
 			do
 				case "$input_inner" in
 				push\ *)
-					append_to @args_ "${input_inner#push }"
+					append_to @r_args "${input_inner#push }"
 				;;
 				*)
 					break
 				;;
 				esac
 			done
-			do_push "$args_"
+			do_push "$r_args"
 			;;
 		?*)
 			echo_die "Unknown input!"
