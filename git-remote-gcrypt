@@ -35,12 +35,16 @@ Repack_limit=25
 Recipients=
 
 # compat/utility functions
-xecho()
+# xfeed: The most basic output function puts $1 into the stdin of $2..$#
+xfeed()
 {
-	cat <<EOF
-$@
+	local input_=
+	input_=$1; shift
+	"$@" <<EOF
+$input_
 EOF
 }
+xecho() { xfeed "$*" cat; }
 xecho_n() { xecho "$@" | tr -d \\n ; } # kill newlines
 echo_git() { xecho "$@" ; }  # Code clarity
 echo_info() { xecho "gcrypt:" "$@" >&2; }
@@ -267,7 +271,7 @@ REMOVE()
 		echo_info "sftp: Ignore remove request $1/$2"
 	elif isurl rsync "$1"
 	then
-		xecho "$2" | rsync -I -W -v -r --delete --include-from=- \
+		xfeed "$2" rsync -I -W -v -r --delete --include-from=- \
 			--exclude='*' "$Localdir"/ "${1#rsync://}/" >&2
 	elif islocalrepo "$1"
 	then
@@ -322,8 +326,8 @@ PRIVDECRYPT()
 	local status_=
 	exec 4>&1 &&
 	status_=$(gpg  --status-fd 3 -q -d 3>&1 1>&4) &&
-	xecho "$status_" | grep "^\[GNUPG:\] ENC_TO " >/dev/null &&
-	(xecho "$status_" | grep -e "$1" >/dev/null || {
+	xfeed "$status_" grep "^\[GNUPG:\] ENC_TO " >/dev/null &&
+	(xfeed "$status_" grep -e "$1" >/dev/null || {
 		echo_info "Failed to verify manifest signature!" &&
 		echo_info "Only accepting signatories: ${2:-(none)}" &&
 		return 1
@@ -406,7 +410,7 @@ read_config()
 		isnull "$r_keyinfo" || isnonnull "${r_keyinfo##*"$Newline"*}" ||
 		echo_info "WARNING: '$recp_' matches multiple keys, using one"
 		r_keyinfo=${r_keyinfo%%"$Newline"*}
-		keyid_=$(xecho "$r_keyinfo" | cut -f 5 -d :)
+		keyid_=$(xfeed "$r_keyinfo" cut -f 5 -d :)
 
 		isnonnull "$keyid_" &&
 		signers_="$signers_ $keyid_" &&
@@ -415,7 +419,7 @@ read_config()
 			continue
 		}
 		# Check 'E'ncrypt capability
-		cap_=$(xecho "$r_keyinfo" | cut -f 12 -d :)
+		cap_=$(xfeed "$r_keyinfo" cut -f 12 -d :)
 		iseq "${cap_#*E}" "$cap_" || Recipients="$Recipients -R $keyid_"
 	done
 
@@ -619,7 +623,7 @@ $Keeplist
 EOF
 	fi
 
-	xecho "$r_del_list" | get_pack_files "$Localdir/pack/"
+	xfeed "$r_del_list" get_pack_files "$Localdir/pack/"
 
 	(set +f; git verify-pack -v "$Localdir"/pack/*.idx ||
 	 echo_kill "git verify-pack failed!") |
@@ -668,12 +672,12 @@ do_fetch()
 	pick_fields_1_2 @premote_ "$Packlist"
 	if [ -s "$Localdir/have_packs+" ]
 	then
-		pneed_=$(xecho "$premote_" | xgrep -v -x -f "$Localdir/have_packs+")
+		pneed_=$(xfeed "$premote_" xgrep -v -x -f "$Localdir/have_packs+")
 	else
 		pneed_=$premote_
 	fi
 
-	xecho "$pneed_" | get_pack_files
+	xfeed "$pneed_" get_pack_files
 
 	echo_git # end with blank line
 }
@@ -698,7 +702,7 @@ do_push()
 	if isnonnull "$Refslist"
 	then
 		# mark all remote refs with  ^<sha-1> (if sha-1 exists locally)
-		r_revlist=$(xecho "$Refslist" | cut -f 1 -d ' ' |
+		r_revlist=$(xfeed "$Refslist" cut -f 1 -d ' ' |
 			safe_git_rev_parse | sed -e 's/^\(.\)/^&/')
 	fi
 
@@ -710,7 +714,7 @@ do_push()
 		if isnonnull "$src_"
 		then
 			append_to @r_revlist "$src_"
-			obj_=$(xecho "$src_" | safe_git_rev_parse)
+			obj_=$(xfeed "$src_" safe_git_rev_parse)
 			append_to @Refslist "$obj_ $dst_"
 		fi
 	done <<EOF
