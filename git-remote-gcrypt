@@ -85,16 +85,14 @@ append_to()
 # $2 input value
 pick_fields_1_2()
 {
-	local f_ret= f_line= f_var= f_oifs="$IFS" IFS=
-	f_var=$1
-	IFS=$Newline
-	for f_line in $2
+	local f_ret= f_one= f_two=
+	while read f_one f_two _ # from << here-document
 	do
-		IFS=$f_oifs
-		set -- $f_line
-		f_ret=$f_ret"${1:-} ${2:-}"$Newline
-	done
-	setvar "$f_var" "${f_ret#$Newline}"
+		f_ret="$f_ret$f_one $f_two$Newline"
+	done <<EOF
+$2
+EOF
+	setvar "$1" "${f_ret#$Newline}"
 }
 
 # Take all lines matching $2 (full line)
@@ -118,13 +116,10 @@ filter_to()
 # Output the number of lines in $1
 line_count()
 {
-	local f_x=0 IFS=
+	local IFS=
 	IFS=$Newline
-	for f_line in $1
-	do
-		f_x=$(($f_x + 1))
-	done
-	xecho "$f_x"
+	set -- $1
+	xecho "$#"
 }
 
 
