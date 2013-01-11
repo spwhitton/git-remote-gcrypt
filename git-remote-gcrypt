@@ -11,17 +11,17 @@
 set -e
 set -u
 
-Did_find_repo=  # yes for connected, no for no repo
 Localdir="${GIT_DIR:=.git}/remote-gcrypt"
 export GITCEPTION="${GITCEPTION:-}+" # Reuse $Gref except when stacked
 Gref="refs/gcrypt/gitception$GITCEPTION"
 Gref_rbranch="refs/heads/master"
-Repoid=
 Packkey_bytes=33  # 33 random bytes for passphrase, still compatible if changed
 Hashtype=SHA256   # SHA512 SHA384 SHA256 SHA224 supported.
 Packpat="pack :*:"
 Manifestfile=91bd0c092128cf2e60e1a608c31e92caf1f9c1595f83f2890ef17c0e4881aa0a
 
+Did_find_repo=  # yes for connected, no for no repo
+Repoid=
 Branchlist=
 Packlist=
 Keeplist=
