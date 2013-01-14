@@ -848,7 +848,8 @@ gcrypt_main_loop()
 	URL=$2   # Remote URL
 
 	mkdir -p "$Localdir"
-	trap cleanup_atexit EXIT 1 2 3 15
+	trap cleanup_atexit EXIT
+	trap 'exit 1' 1 2 3 15
 
 	echo_info "Development version -- Repository format MAY CHANGE"
 
