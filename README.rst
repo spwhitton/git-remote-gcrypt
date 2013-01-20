@@ -32,17 +32,15 @@ Quickstart
 
 * Install ``git-remote-gcrypt`` by running the supplied ``install.sh`` script.
 
-* Create an encrypted remote by pushing to it:
+* Create an encrypted remote by pushing to it::
 
-    ::
-
-        git remote add cryptremote gcrypt::rsync://example.com:repo
-        git push cryptremote master
-        > gcrypt: Setting up new repository
-        > gcrypt: Remote ID is :id:7VigUnLVYVtZx8oir34R
-        > [ more lines .. ]
-        > To gcrypt::[...]
-        > * [new branch]      master -> master
+    git remote add cryptremote gcrypt::rsync://example.com:repo
+    git push cryptremote master
+    > gcrypt: Setting up new repository
+    > gcrypt: Remote ID is :id:7VigUnLVYVtZx8oir34R
+    > [ more lines .. ]
+    > To gcrypt::[...]
+    > * [new branch]      master -> master
 
 Configuration
 =============
@@ -50,47 +48,47 @@ Configuration
 The following ``git-config(1)`` variables are supported:
 
 ``remote.<name>.gcrypt-participants``
-        ..
+    ..
 ``gcrypt.participants``
-        Space-separated list of GPG key identifiers. The remote is
-        encrypted to these participants and only signatures from these
-        are accepted. ``gpg -k`` lists all public keys you know.
+    Space-separated list of GPG key identifiers. The remote is encrypted
+    to these participants and only signatures from these are accepted.
+    ``gpg -k`` lists all public keys you know.
 
-        When not set we encrypt to your default key and accept any valid
-        signature. This behavior can also be requested explicitly by
-        setting participants to ``simple``.
+    When not set we encrypt to your default key and accept any valid
+    signature. This behavior can also be requested explicitly by setting
+    participants to ``simple``.
 
-        The ``gcrypt-participants`` setting on the remote takes precedence
-        over the repository variable ``gcrypt.participants``.
+    The ``gcrypt-participants`` setting on the remote takes precedence
+    over the repository variable ``gcrypt.participants``.
 
 ``user.signingkey``
-        (From regular git configuration) The key to use for signing.
-        You should set ``user.signingkey`` if your default signing key is
-        not part of the participant list.
+    (From regular git configuration) The key to use for signing.  You
+    should set ``user.signingkey`` if your default signing key is not
+    part of the participant list.
 
 Environment Variables
 =====================
 
 *GCRYPT_FULL_REPACK*
-        This environment variable forces full repack when pushing.
+    This environment variable forces full repack when pushing.
 
 Examples
 ========
 
-::
+How to set up a remote for two participants::
 
-    git config gcrypt.participants YOURKEYID
-    git remote add cryptremote  gcrypt::rsync://example.com:repo
-    git push cryptremote HEAD
+    git remote add cryptremote gcrypt::rsync://example.com:repo
+    git config remote.cryptremote.gcrypt-participants "KEY1 KEY2"
+    git push cryptremote master
 
 How to use a git backend::
 
-    # notice that the target repo must already exist and its
+    # notice that the target git repo must already exist and its
     # `next` branch will be overwritten!
     git remote add gitcrypt gcrypt::git@example.com:repo#next
-    git push gitcrypt HEAD
+    git push gitcrypt master
 
-The URL fragment (`#next` here) indicates which branch is used.
+The URL fragment (`#next` here) indicates which backend branch is used.
 
 Notes
 =====
@@ -104,20 +102,20 @@ Collaboration
 
 Dependencies
     ``rsync`` and ``curl`` for remotes ``rsync:`` and ``sftp:``
-    respectively. The main executable is a script for any
-    POSIX-compliant shell supporting ``local``.
+    respectively. The main executable requires a POSIX-compliant shell
+    that supports ``local``.
 
 GNU Privacy Guard
-    GPG 1.4 or 2 are both supported. You need a configured personal
-    keypair. GPG configuration applies to algorithm choices for
-    public-key encryption, symmetric encryption, and signing. See
-    ``man gpg`` for more information.
+    Both GPG 1.4 and 2 are supported. You need a personal GPG key. GPG
+    configuration applies to algorithm choices for public-key
+    encryption, symmetric encryption, and signing. See ``man gpg`` for
+    more information.
 
 Remote ID
-    The generated Remote ID is not secret, it only exists to ensure that
-    two repositories signed by the same user can be distinguished.  You
-    will see a warning if the Remote ID changes, which should
-    only happen if the remote was re-created.
+    The Remote ID is not secret; it only ensures that two repositories
+    signed by the same user can be distinguished.  You will see
+    a warning if the Remote ID changes, which should only happen if the
+    remote was re-created.
 
 Repository Format
 .................
@@ -139,15 +137,15 @@ Repository Format
 |
 | To write the repository:
 |
-| Store each packfile ``P`` as ``P'`` = ``Encrypt(Ki, P)`` in filename ``Hi``
-|   where ``Ki`` is a new random string and ``Hi = Hash(P')``
+| Store each packfile ``P`` as ``Encrypt(Ki, P) -> P'`` in filename ``Hi``
+|   where ``Ki`` is a new random string and ``Hash(P') -> Hi``
 | Store ``EncSign(B || L || R)`` in the manifest
 |
 | To read the repository:
 |
 | Decrypt and verify manifest using GPG keyring ``-> (B, L, R)``
 | Warn if ``R`` does not match previously seen Remote ID
-| ``for each Hi, Ki in L``:
+| for each ``Hi, Ki in L``:
 |   Get file ``Hi`` from the server ``-> P'``
 |   Verify ``Hash(P')`` matches ``Hi``
 |   Decrypt ``P'`` using ``Ki`` -> ``P`` then open ``P`` with git
@@ -157,17 +155,17 @@ Repository Format
 Manifest file
 .............
 
-::
+Example manifest file (with ellipsis for brevity)::
 
     $ gpg -d 91bd0c092128cf2e60e1a608c31e92caf1f9c1595f83f2890ef17c0e4881aa0a
     542051c7cd152644e4995bda63cc3ddffd635958 refs/heads/next
     3c9e76484c7596eff70b21cbe58408b2774bedad refs/heads/master
-    pack :SHA256:f2ad50316fbca42c553810aec3709c24974585ec1b34aae77d5cd4ba67092dc4 z8YoAnFpMlWPIYG8wo1adewd4Fp7Fo3PkI2mND49P1qm
-    pack :SHA256:a6e17bb4c042bdfa8e38856ee6d058d0c0f0c575ace857c4795426492f379584 82+k2cbiUn7i2cW0dgXfyX6wXGpvVaQGj5sF59Y8my5W
-    keep :SHA256:f2ad50316fbca42c553810aec3709c24974585ec1b34aae77d5cd4ba67092dc4 1
+    pack :SHA256:f2ad50316...cd4ba67092dc4 z8YoAnFpMlW...3PkI2mND49P1qm
+    pack :SHA256:a6e17bb4c...426492f379584 82+k2cbiUn7...dgXfyX6wXGpvVa
+    keep :SHA256:f2ad50316...cd4ba67092dc4 1
     repo :id:OYiSleGirtLubEVqJpFF
 
-Each item extends until newline, and matches one of the following forms:
+Each item extends until newline, and matches one of the following:
 
 ``<sha-1> <gitref>``
     Git object id and its ref
@@ -195,7 +193,5 @@ License
 git-remote-gcrypt is licensed under the terms of the GNU GPL version 2
 (or at your option, any later version). See http://www.gnu.org/licenses/
 
-
-.. vim: ft=rst tw=72
 .. this document generates a man page with rst2man
-
+.. vim: ft=rst tw=72 sts=4
