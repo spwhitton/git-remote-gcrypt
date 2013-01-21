@@ -15,10 +15,10 @@ Remote helper programs are invoked by git to handle network transport.
 This helper handles `gcrypt::` URLs that will access a remote repository
 encrypted with GPG, using our custom format.
 
-Supported locations are `local`, `rsync://` and `sftp://`, where
-the repository is stored as a set of files, or instead any `<giturl>`
-where gcrypt will store the same representation in a git repository,
-bridged over arbitrary git transport.
+Supported locations are `local`, `rsync://` and `sftp://`, where the
+repository is stored as a set of files, or instead any `<giturl>` where
+gcrypt will store the same representation in a git repository, bridged
+over arbitrary git transport.
 
 The aim is to provide confidential, authenticated git storage and
 collaboration using typical untrusted file hosts or services.
@@ -53,9 +53,9 @@ The following ``git-config(1)`` variables are supported:
     to these participants and only signatures from these are accepted.
     ``gpg -k`` lists all public keys you know.
 
-    When not set we encrypt to your default key and accept any valid
-    signature. This behavior can also be requested explicitly by setting
-    participants to ``simple``.
+    If this option is not set, we encrypt to your default key and accept
+    any valid signature. This behavior can also be requested explicitly
+    by setting participants to ``simple``.
 
     The ``gcrypt-participants`` setting on the remote takes precedence
     over the repository variable ``gcrypt.participants``.
