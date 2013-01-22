@@ -601,7 +601,7 @@ repack_if_needed()
 
 	n_=$(line_count "$Packlist")
 	m_=$(line_count "$pkeep_")
-	if [ $Repack_limit -gt "$(($n_ - $m_))" ]; then
+	if [ "$Repack_limit" -gt "$(($n_ - $m_))" ]; then
 		return
 	fi
 	echo_info "Repacking remote $NAME, ..."
@@ -704,7 +704,7 @@ do_fetch()
 	pick_fields @premote_ 1,2 "$Packlist"
 	if [ -s "$Localdir/have_packs+" ]
 	then
-		pneed_="$(xecho "$premote_" | xgrep -v -x -f "$Localdir/have_packs+")"
+		pneed_=$(xecho "$premote_" | xgrep -v -x -f "$Localdir/have_packs+")
 	else
 		pneed_=$premote_
 	fi
@@ -862,7 +862,7 @@ gcrypt_main_loop()
 			do_list
 			;;
 		fetch\ *)
-			r_args="${input_##fetch }"
+			r_args=${input_##fetch }
 			while read input_inner
 			do
 				case "$input_inner" in
@@ -877,7 +877,7 @@ gcrypt_main_loop()
 			do_fetch "$r_args"
 			;;
 		push\ *)
-			r_args="${input_##push }"
+			r_args=${input_##push }
 			while read input_inner
 			do
 				case "$input_inner" in
