@@ -92,7 +92,7 @@ gitception_get()
 	# Take care to preserve FETCH_HEAD
 	local ret_=: obj_id= f_head="$GIT_DIR/FETCH_HEAD"
 	[ -e "$f_head" ] && command mv -f "$f_head" "$f_head.$$~" || :
-	git fetch -q -f "$1" "$Gref_rbranch:$Gref" 2>/dev/tty >/dev/null &&
+	git fetch -q -f "$1" "$Gref_rbranch:$Gref" >/dev/null &&
 		obj_id="$(git ls-tree "$Gref" | xgrep -E '\b'"$2"'$' | awk '{print $3}')" &&
 		isnonnull "$obj_id" && git cat-file blob "$obj_id" && ret_=: ||
 		{ ret_=false && : ; }
@@ -147,7 +147,7 @@ gitception_new_repo()
 	local empty_tree=4b825dc642cb6eb9a060e54bf8d69288fbee4904
 	# get any file to update Gref, and if it's not updated we create empty
 	git update-ref -d "$Gref" || :
-	gitception_get "$1" "x" || :
+	gitception_get "$1" "x" 2>/dev/null >&2 || :
 	git rev-parse -q --verify "$Gref" >/dev/null && return 0 ||
 		commit_id=$(anon_commit "$empty_tree") &&
 		git update-ref "$Gref" "$commit_id"
