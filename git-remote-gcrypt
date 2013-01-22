@@ -360,9 +360,6 @@ gpg_hash()
 	xecho "${hash_%:}"
 }
 
-pack_hash() { gpg_hash "$Hashtype"; }
-
-
 # Pass the branch/ref by pipe to git
 safe_git_rev_parse()
 {
@@ -743,7 +740,7 @@ EOF
 		GIT_ALTERNATE_OBJECT_DIRECTORIES=$Localdir \
 			git pack-objects --stdout < "$tmp_objlist" |
 			ENCRYPT "$key_" > "$tmp_encrypted"
-		pack_id=$(pack_hash < "$tmp_encrypted")
+		pack_id=$(gpg_hash "$Hashtype" < "$tmp_encrypted")
 
 		append_to @Packlist "pack :${Hashtype}:$pack_id $key_"
 		if isnonnull "$r_pack_delete"
