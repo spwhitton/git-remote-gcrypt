@@ -732,11 +732,15 @@ EOF
 	if [ -s "$tmp_objlist" ]
 	then
 		key_=$(genkey "$Packkey_bytes")
-		(GIT_ALTERNATE_OBJECT_DIRECTORIES=$Localdir \
-			git pack-objects --stdout < "$tmp_objlist" ||
-			echo_kill "git pack-objects failed!") |
-			ENCRYPT "$key_" > "$tmp_encrypted"
-		pack_id=$(gpg_hash "$Hashtype" < "$tmp_encrypted")
+		pack_id=$(\
+			{
+				GIT_ALTERNATE_OBJECT_DIRECTORIES=$Localdir \
+				git pack-objects --stdout < "$tmp_objlist" ||
+				echo_kill "git pack-objects failed!"
+			} | {
+				ENCRYPT "$key_" ||
+				echo_kill "gpg -c failed!"
+			} | tee "$tmp_encrypted" | gpg_hash "$Hashtype")
 
 		append_to @Packlist "pack :${Hashtype}:$pack_id $key_"
 		if isnonnull "$r_pack_delete"
