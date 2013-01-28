@@ -589,7 +589,8 @@ fetch_decrypt_pack()
 # $4 to list of packfiles to delete
 repack_if_needed()
 {
-	local pack_= packline_= premote_= key_= pkeep_= n_= m_=
+	local pack_= packline_= premote_= key_= pkeep_= n_= m_= \
+		orig_ifs= kline_= pline_= plist_new=
 
 	# $TmpPack_Encrypted set in caller
 
@@ -642,7 +643,16 @@ repack_if_needed()
 		Packlist=
 	else
 		setvar "$4" "$(xecho "$premote_" | xgrep -v -e "$pkeep_")"
-		Packlist=$(xecho "$Packlist" | xgrep -e "$pkeep_")
+		orig_ifs=$IFS
+		IFS=$Newline
+		for kline_ in $pkeep_
+		do
+			IFS=$orig_ifs
+			filter_to @pline_ "pack $kline_ " "$Packlist"
+			append_to @plist_new "$pline_"
+		done
+		IFS=$orig_ifs
+		Packlist=$plist_new
 	fi
 
 	pack_id=$(pack_hash < "$TmpPack_Encrypted")
