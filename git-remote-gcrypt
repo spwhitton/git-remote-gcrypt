@@ -48,7 +48,7 @@ echo_die() { echo_info "$@" ; exit 1; }
 isnull() { case "$1" in "") return 0;; *) return 1;; esac; }
 isnonnull() { ! isnull "$1"; }
 iseq() { case "$1" in "$2") return 0;; *) return 1;; esac; }
-isnoteq() { ! iseq "$@"; }
+isnoteq() { ! iseq "$1" "$2"; }
 negate() { ! "$@"; }
 
 isurl() { isnull "${2%%$1://*}"; }
