@@ -8,9 +8,10 @@
 #
 # See README
 
-set -e
-set -u
-set -f
+set -e # errexit
+set -u # nounset
+set -f # noglob
+set -C # noclobber
 
 Localdir="${GIT_DIR:=.git}/remote-gcrypt"
 export GITCEPTION="${GITCEPTION:-}+" # Reuse $Gref except when stacked
@@ -222,7 +223,7 @@ PUT()
 		rsync -I -W "$3" "${1#rsync://}"/"$2" >&2
 	elif islocalrepo "$1"
 	then
-		cat > "$1/$2" < "$3"
+		cat >| "$1/$2" < "$3"
 	else
 		gitception_put "${1#gitception://}" "$2" < "$3"
 	fi
@@ -343,6 +344,12 @@ gpg_hash()
 	xecho "${hash_%:}"
 }
 
+# $1 type
+tempname()
+{
+	xecho "$Localdir/tmp_$1_.$$"
+}
+
 # Pass the branch/ref by pipe to git
 safe_git_rev_parse()
 {
@@ -426,7 +433,8 @@ read_config()
 
 ensure_connected()
 {
-	local manifest_= r_repoid= r_name= url_frag= r_sigmatch= r_signers=
+	local manifest_= r_repoid= r_name= url_frag= r_sigmatch= r_signers= \
+		tmp_manifest=
 
 	if isnonnull "$Did_find_repo"
 	then
@@ -484,18 +492,18 @@ ensure_connected()
 		Repoid=$(git config "remote.$r_name.gcrypt-id" || :)
 
 
-	TmpManifest_Enc="$Localdir/tmp_manifest.$$"
-	GET "$URL" "$Manifestfile" "$TmpManifest_Enc" 2>/dev/null || {
+	tmp_manifest=$(tempname maniF)
+	GET "$URL" "$Manifestfile" "$tmp_manifest" 2>/dev/null || {
 		echo_info "Repository not found: $URL"
 		return 0
 	}
 
 	Did_find_repo=yes
 	echo_info "Decrypting manifest"
-	manifest_=$(PRIVDECRYPT "$r_sigmatch" "$r_signers" < "$TmpManifest_Enc") &&
+	manifest_=$(PRIVDECRYPT "$r_sigmatch" "$r_signers" < "$tmp_manifest") &&
 		isnonnull "$manifest_" ||
 		echo_die "Failed to decrypt manifest!"
-	rm -f "$TmpManifest_Enc"
+	rm -f "$tmp_manifest"
 
 	filter_to @Refslist "$Hex40 *" "$manifest_"
 	filter_to @Packlist "pack :*:* *" "$manifest_"
@@ -530,7 +538,7 @@ ensure_connected()
 get_verify_decrypt_pack()
 {
 	local rcv_id= tmp_encrypted=
-	tmp_encrypted="$Localdir/tmp_pack_ENCRYPTED_.$$"
+	tmp_encrypted=$(tempname packF)
 	GET "$URL" "$2" "$tmp_encrypted" &&
 	rcv_id=$(gpg_hash "$1" < "$tmp_encrypted") &&
 	iseq "$rcv_id" "$2" || echo_die "Packfile $2 does not match digest!"
@@ -678,7 +686,7 @@ do_push()
 	# file's hash. The manifest is updated with the pack id.
 	# The manifest is encrypted.
 	local r_revlist= pack_id= key_= obj_= src_= dst_= \
-		r_pack_delete= tmp_encrypted= tmp_objlist=
+		r_pack_delete= tmp_encrypted= tmp_objlist= tmp_manifest=
 
 	ensure_connected
 
@@ -709,8 +717,8 @@ do_push()
 $1
 EOF
 
-	tmp_encrypted="$Localdir/tmp_pack_ENCRYPTED_.$$"
-	tmp_objlist="$Localdir/tmp_packrevlist.$$"
+	tmp_encrypted=$(tempname packP)
+	tmp_objlist=$(tempname objlP)
 
 	xecho "$r_revlist" | git rev-list --objects --stdin -- > "$tmp_objlist"
 	# Only send pack if we have any objects to send
@@ -736,9 +744,8 @@ EOF
 	echo_info "Encrypting to: $Recipients"
 	echo_info "Requesting manifest signature"
 
-	TmpManifest_Enc="$Localdir/tmp_manifest.$$"
-
-	PRIVENCRYPT "$Recipients" > "$TmpManifest_Enc" <<EOF
+	tmp_manifest=$(tempname maniP)
+	PRIVENCRYPT "$Recipients" > "$tmp_manifest" <<EOF
 $Refslist
 $Packlist
 $Keeplist
@@ -753,11 +760,11 @@ EOF
 	fi
 
 	# Upload manifest
-	PUT "$URL" "$Manifestfile" "$TmpManifest_Enc"
+	PUT "$URL" "$Manifestfile" "$tmp_manifest"
 
 	rm -f "$tmp_encrypted"
 	rm -f "$tmp_objlist"
-	rm -f "$TmpManifest_Enc"
+	rm -f "$tmp_manifest"
 
 	# Delete packs
 	if isnonnull "$r_pack_delete"; then
@@ -783,10 +790,9 @@ EOF
 	echo_git 
 }
 
-cleanup_atexit()
+cleanup_tmpfiles()
 {
-	set +f
-	rm -f "$Localdir"/tmp_*".$$" >&2
+	(set +f; rm -f "$Localdir"/tmp_*".$$" >&2)
 }
 
 # handle git-remote-helpers protocol
@@ -797,9 +803,11 @@ gcrypt_main_loop()
 	NAME=$1  # Remote name
 	URL=$2   # Remote URL
 
-	mkdir -p "$Localdir"
-	trap cleanup_atexit EXIT
+	trap cleanup_tmpfiles EXIT
 	trap 'exit 1' 1 2 3 15
+
+	mkdir -p "$Localdir"
+	cleanup_tmpfiles
 
 	echo_info "Development version -- Repository format MAY CHANGE"
 
