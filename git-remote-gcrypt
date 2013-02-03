@@ -49,6 +49,7 @@ isnull() { case "$1" in "") return 0;; *) return 1;; esac; }
 isnonnull() { ! isnull "$1"; }
 iseq() { case "$1" in "$2") return 0;; *) return 1;; esac; }
 isnoteq() { ! iseq "$@"; }
+negate() { ! "$@"; }
 
 isurl() { isnull "${2%%$1://*}"; }
 islocalrepo() { isnull "${1##/*}" && [ ! -e "$1/HEAD" ]; }
@@ -117,34 +118,22 @@ pick_fields()
 	setvar "$f_ret_var" "$f_result_"
 }
 
-# Remove all lines matching $2 (full line)
+# Take all lines matching $2 (full line)
 # $1 return variable name
 # $2 filter word
 # $3 input value
-filter_remove()
-{
-	local f_line= f_result_= IFS=
-	IFS=$Newline
-	for f_line in $3
-	do
-		isnull "${f_line##$2}" || append_to @f_result_ "$f_line"
-	done
-	setvar "$1" "$f_result_"
-}
-
-# Take all lines matching $2 (anchored front)
-# $1 return variable name
-# $2 filter word
-# $3 input value
+#  if $1 is a literal `!', the match is reversed (and arguments shift)
+#  we instead remove all lines matching
 filter_to()
 {
-	local f_line= f_result_= IFS=
+	local f_neg= f_line= f_ret= IFS=
+	isnoteq "$1" "!" || { f_neg=negate; shift; }
 	IFS=$Newline
 	for f_line in $3
 	do
-		iseq "$f_line" "${f_line#$2}" || append_to @f_result_ "$f_line"
+		$f_neg isnonnull "${f_line##$2}" || f_ret=$f_ret$f_line$Newline
 	done
-	setvar "$1" "$f_result_"
+	setvar "$1" "${f_ret%$Newline}"
 }
 
 # Output the number of lines in $1
@@ -438,7 +427,7 @@ read_config()
 
 	for recp_ in $conf_part
 	do
-		filter_to @r_keyinfo "pub" \
+		filter_to @r_keyinfo "pub*" \
 			"$(gpg --with-colons --fast-list -k "$recp_")"
 		isnull "$r_keyinfo" || isnonnull "${r_keyinfo##*"$Newline"*}" ||
 		echo_info "WARNING: '$recp_' matches multiple keys, using one"
@@ -541,11 +530,11 @@ ensure_connected()
 		echo_die "Failed to decrypt manifest!"
 	rm -f "$TmpManifest_Enc"
 
-	filter_to @Packlist "pack " "$manifest_"
-	filter_to @Keeplist "keep " "$manifest_"
-	filter_to @Extension_list "extn " "$manifest_"
-	filter_to @r_repoid "repo " "$manifest_"
-	filter_to @Branchlist "$Hex40 " "$manifest_"
+	filter_to @Packlist "pack *" "$manifest_"
+	filter_to @Keeplist "keep *" "$manifest_"
+	filter_to @Extension_list "extn *" "$manifest_"
+	filter_to @r_repoid "repo *" "$manifest_"
+	filter_to @Branchlist "$Hex40 *" "$manifest_"
 
 	r_repoid=${r_repoid#repo }
 	r_repoid=${r_repoid% *}
@@ -583,7 +572,7 @@ fetch_decrypt_pack()
 	rcv_id=$(gpg_hash "$r_htype" < "$TmpPack_Encrypted") &&
 	iseq "$rcv_id" "$r_pack" ||
 		echo_die "Packfile $r_pack does not match digest!"
-	filter_to @r_key "pack :${r_htype}:$r_pack" "$Packlist"
+	filter_to @r_key "pack :${r_htype}:$r_pack *" "$Packlist"
 	pick_fields @r_key 3 "$r_key"
 	DECRYPT "$r_key" < "$TmpPack_Encrypted"
 }
@@ -652,7 +641,7 @@ repack_if_needed()
 		for kline_ in $pkeep_
 		do
 			IFS=$orig_ifs
-			filter_to @r_line "pack $kline_ " "$Packlist"
+			filter_to @r_line "pack $kline_ *" "$Packlist"
 			append_to @r_list_new "$r_line"
 		done
 		IFS=$orig_ifs
@@ -762,7 +751,7 @@ do_push()
 		# +src:dst -- remove leading + then split at :
 		splitcolon "${line_#+}" @r_src @r_dst
 
-		filter_remove @Branchlist "$Hex40 $r_dst" "$Branchlist"
+		filter_to ! @Branchlist "$Hex40 $r_dst" "$Branchlist"
 
 		if isnonnull "$r_src"
 		then
