@@ -25,10 +25,10 @@ Hex40=$Hex40$Hex40$Hex40$Hex40$Hex40 # Match SHA-1 hexdigest
 
 Did_find_repo=  # yes for connected, no for no repo
 Repoid=
-Branchlist=
+Refslist=
 Packlist=
 Keeplist=
-Extension_list=
+Extnlist=
 Repack_limit=25
 
 Recipients=
@@ -393,7 +393,7 @@ make_new_repo()
 	iseq "${NAME#gcrypt::}" "$URL" ||
 		git config "remote.$NAME.gcrypt-id" "$Repoid"
 	echo_info "Remote ID is $Repoid"
-	Extension_list=$(xecho "extn comment")
+	Extnlist="extn comment"
 }
 
 
@@ -530,11 +530,11 @@ ensure_connected()
 		echo_die "Failed to decrypt manifest!"
 	rm -f "$TmpManifest_Enc"
 
+	filter_to @Refslist "$Hex40 *" "$manifest_"
 	filter_to @Packlist "pack *" "$manifest_"
 	filter_to @Keeplist "keep *" "$manifest_"
-	filter_to @Extension_list "extn *" "$manifest_"
+	filter_to @Extnlist "extn *" "$manifest_"
 	filter_to @r_repoid "repo *" "$manifest_"
-	filter_to @Branchlist "$Hex40 *" "$manifest_"
 
 	r_repoid=${r_repoid#repo }
 	r_repoid=${r_repoid% *}
@@ -667,7 +667,7 @@ do_list()
 	local obj_id= ref_name= line_=
 	ensure_connected
 
-	xecho "$Branchlist" | while read line_
+	xecho "$Refslist" | while read line_
 	do
 		isnonnull "$line_" || break
 		obj_id=${line_%% *}
@@ -739,10 +739,10 @@ do_push()
 		make_new_repo
 	fi
 
-	if isnonnull "$Branchlist"
+	if isnonnull "$Refslist"
 	then
 		# mark all remote refs with  ^<sha-1> (if sha-1 exists locally)
-		r_revlist=$(xecho "$Branchlist" | cut -f 1 -d ' ' |
+		r_revlist=$(xecho "$Refslist" | cut -f 1 -d ' ' |
 			safe_git_rev_parse | sed -e 's/^\(.\)/^&/')
 	fi
 
@@ -751,13 +751,13 @@ do_push()
 		# +src:dst -- remove leading + then split at :
 		splitcolon "${line_#+}" @r_src @r_dst
 
-		filter_to ! @Branchlist "$Hex40 $r_dst" "$Branchlist"
+		filter_to ! @Refslist "$Hex40 $r_dst" "$Refslist"
 
 		if isnonnull "$r_src"
 		then
 			append_to @r_revlist "$r_src"
 			obj_=$(xecho "$r_src" | safe_git_rev_parse)
-			append_to @Branchlist "$obj_ $r_dst"
+			append_to @Refslist "$obj_ $r_dst"
 		fi
 	done <<EOF
 $1
@@ -791,11 +791,11 @@ EOF
 	TmpManifest_Enc="$Localdir/tmp_manifest.$$"
 
 	PRIVENCRYPT "$Recipients" > "$TmpManifest_Enc" <<EOF
-$Branchlist
+$Refslist
 $Packlist
 $Keeplist
 repo $Repoid
-$Extension_list
+$Extnlist
 EOF
 
 	# Upload pack
