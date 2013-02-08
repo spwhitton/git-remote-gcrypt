@@ -394,14 +394,14 @@ read_config()
 
 ensure_connected()
 {
-	local manifest_= rcv_repoid= r_name= url_frag= good_sig= signers_=
+	local manifest_= rcv_repoid= r_name= url_frag= sig_match= signer_text=
 
 	if isnonnull "$Did_find_repo"
 	then
 		return
 	fi
 	Did_find_repo=no
-	read_config good_sig signers_
+	read_config sig_match signer_text
 
 	iseq "${NAME#gcrypt::}" "$URL" || r_name=$NAME
 
@@ -460,7 +460,7 @@ ensure_connected()
 
 	Did_find_repo=yes
 	echo_info "Decrypting manifest"
-	manifest_=$(PRIVDECRYPT "$good_sig" "$signers_" < "$TmpManifest_Enc") &&
+	manifest_=$(PRIVDECRYPT "$sig_match" "$signer_text" < "$TmpManifest_Enc") &&
 		isnonnull "$manifest_" ||
 		echo_die "Failed to decrypt manifest!"
 	rm -f "$TmpManifest_Enc"
