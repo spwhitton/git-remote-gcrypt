@@ -733,11 +733,13 @@ EOF
 	then
 		PUT "$URL" "$pack_id" "$TmpPack_Encrypted"
 	fi
-	rm -f "$TmpPack_Encrypted"
-	rm -f "$TmpObjlist"
 
 	# Upload manifest
 	PUT "$URL" "$Manifestfile" "$TmpManifest_Enc"
+
+	rm -f "$TmpPack_Encrypted"
+	rm -f "$TmpObjlist"
+	rm -f "$TmpManifest_Enc"
 
 	# Delete packs
 	if isnonnull "$pack_delete"; then
@@ -750,8 +752,6 @@ EOF
 	fi
 
 	PUT_FINAL "$URL"
-
-	rm -f "$TmpManifest_Enc"
 
 	# ok all updates
 	xecho "$1" | while read line_
