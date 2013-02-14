@@ -15,9 +15,9 @@ export GITCEPTION="${GITCEPTION:-}+" # Reuse $Gref except when stacked
 Gref="refs/gcrypt/gitception$GITCEPTION"
 Gref_rbranch="refs/heads/master"
 Repoid=
-Hashpfx=":SHA224:"
-Packpfx="pack $Hashpfx"
-Packkey_bytes=33
+Packkey_bytes=33  # 33 random bytes for passphrase, still compatible if changed
+Hashtype=SHA224   # incompatible if changed
+Packpfx="pack :${Hashtype}:"
 
 Branchlist=
 Packlist=
@@ -64,7 +64,7 @@ splitcolon()
 	prefix_=${1%%:*}
 	suffix_=${1#*:}
 }
-repoidstr() { xecho "repo $Hashpfx$Repoid 1"; }
+repoidstr() { xecho "repo :${Hashtype}:$Repoid 1"; }
 
 ## gitception part
 # Fetch giturl $1, file $2
@@ -261,7 +261,7 @@ genkey()
 pack_hash()
 {
 	local hash_=
-	hash_=$(gpg --with-colons --print-md SHA224 | tr A-F a-f)
+	hash_=$(gpg --with-colons --print-md "$Hashtype" | tr A-F a-f)
 	hash_=${hash_#:*:}
 	xecho "${hash_%:}"
 }
@@ -280,7 +280,7 @@ make_new_repo()
 	PUTREPO "$URL"
 
 	# We need a relatively short ID for URL+REPO
-	# The manifest will be stored at SHA224(urlid_)
+	# The manifest will be stored at pack_hash($urlid_)
 	# Needed assumption: the same user should have no duplicate urlid_
 	# For now, we arbitrarily use 9 random bytes (72 bits)
 	urlid_=$(genkey 9 | tr '/+' 'Zz')
