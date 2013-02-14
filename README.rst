@@ -27,15 +27,15 @@ bridged over arbitrary git transport.
 Quickstart
 ..........
 
-Install as `git-remote-gcrypt` in `$PATH`.
+* Install `git-remote-gcrypt` by running the supplied `install.sh` script.
 
-Configure the list of participant gpg keys:
+* Configure the list of participant gpg keys:
 
     ::
 
         git config --global gcrypt.participants YOURKEYID
 
-Create an encrypted remote by pushing to it:
+* Create an encrypted remote by pushing to it:
 
     ::
 
@@ -49,7 +49,7 @@ Create an encrypted remote by pushing to it:
         > To gcrypt::[...]
         > * [new branch]      master -> master
 
-Share the updated Repository URL with all participants.
+* Share the updated Repository URL with all participants.
 
 (The generated Repository ID is not secret, it only exists to ensure
 that two repositories signed by the same user can not be maliciously
