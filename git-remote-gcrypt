@@ -106,7 +106,7 @@ append()
 }
 
 tac() { sed '1!G;h;$!d'; }
-echo_info() { echo "$@" >&2; }
+echo_info() { echo "gcrypt:" "$@" >&2; }
 
 make_new_repo()
 {
@@ -119,9 +119,9 @@ make_new_repo()
 	RECIPIENTS=$(git config gcrypt.recipients | sed -e 's/\([^ ]\+\)/-R &/g')
 	if [ -z "$RECIPIENTS" ]
 	then
-		echo_info "> You must configure which GnuPG recipients can access the repository."
-		echo_info "> To setup for all your git repositories, use::"
-		echo_info ">   git config --global gcrypt.recipients KEYID"
+		echo_info "You must configure which GnuPG recipients can access the repository."
+		echo_info "To setup for all your git repositories, use::"
+		echo_info "  git config --global gcrypt.recipients KEYID"
 		exit 1
 	fi
 	PUTREPO "$URL"
