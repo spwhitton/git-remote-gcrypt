@@ -43,10 +43,10 @@ gitception_get()
 	local RETVAL
 	FHEAD="$GIT_DIR/FETCH_HEAD"
 	[ -e "$FHEAD" ] && command mv -f "$FHEAD" "$FHEAD.$$~" || :
-	git fetch -q -f "$1" HEAD:"$GREF" 2>/dev/tty >/dev/null && \
-		OBJID=$(git ls-tree "$GREF" | xgrep -E "\b$2$" |
-			awk '{print $3}') && [ -n "$OBJID" ] && \
-		git cat-file blob "$OBJID" && RETVAL=: || \
+	git fetch -q -f "$1" HEAD:"$GREF" 2>/dev/tty >/dev/null &&
+		OBJID="$(git ls-tree "$GREF" |
+			xgrep -E "\b$2$" | awk '{print $3}')" &&
+		[ -n "$OBJID" ] && git cat-file blob "$OBJID" && RETVAL=: ||
 		{ RETVAL=false && : ; }
 	[ -e "$FHEAD.$$~" ] && command mv -f "$FHEAD.$$~" "$FHEAD" || :
 	$RETVAL
