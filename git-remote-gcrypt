@@ -25,7 +25,7 @@ sha1()
 LOCALDIR="${GIT_DIR:-.git}/remote-gcrypt"
 DUMMYKEY="00000000000000000000"
 
-isurl() { test -z ${2%%"$1"://*} ; }
+isurl() { test -z ${2%%$1://*} ; }
 
 # Split $1 into $prefix_:$suffix_
 splitcolon()
@@ -84,6 +84,9 @@ PUTREPO()
 
 ENCRYPT()
 {
+	# Security protocol:
+	# Symmetric encryption using the long MASTERKEY. We use AES
+	# and OpenPGP's modification detection code (mdc).
 	(printf "%s" "$MASTERKEY" | \
 		gpg --batch --force-mdc --cipher-algo AES \
 			--passphrase-fd 0 --output - -c /dev/fd/3) 3<&0
@@ -100,8 +103,9 @@ echo_info() { echo "$@" >&2; }
 
 make_new_repo()
 {
-	# Security protocol
-	# The MASTERKEY is encrypted to all RECIPIENTS
+	# Security protocol:
+	# The MASTERKEY is encrypted to all RECIPIENTS. The key is a long
+	# ascii-encoded string used for symmetric encryption with GnuPG.
 	local RECIPIENTS
 	echo_info "Setting up new repository at $URL"
 	RECIPIENTS=$(git config gcrypt.recipients | sed -e 's/\([^ ]\+\)/-R &/g')
@@ -113,7 +117,6 @@ make_new_repo()
 		exit 1
 	fi
 	PUTREPO "$URL"
-	# Use an ascii key for GnuPG (due to its input limitations)
 	echo_info "Generating new master key"
 	MASTERKEY="$(genkey)"
 	printf "%s" "$MASTERKEY" | gpg -e $RECIPIENTS | PUT "$URL" masterkey
@@ -154,7 +157,7 @@ do_list()
 do_fetch()
 {
 	# Security protocol:
-	# The PACK id is the sha-1 of the encrypted git packfile.
+	# The PACK id is the SHA-1 of the encrypted git packfile.
 	# We only download packs mentioned in the encrypted 'packfest',
 	# and check their digest when received.
 	local PNEED
@@ -196,11 +199,13 @@ do_fetch()
 	echo # end with blank line
 }
 
-# do_push PUSHARGS  (multiple lines)
+# do_push PUSHARGS (multiple lines like +src:dst, with both + and src opt.)
 do_push()
 {
-	# each line is (with optional `+` and src)
-	# +src:dst
+	# Security protocol:
+	# Each git packfile is encrypted and then named for the encrypted
+	# file's SHA-1. `packfest` is updated with the pack id.
+	# The packfest and manifest are encrypted.
 	local REMOTEHAS
 	local REMOTEWANT
 	local PACKFEST
