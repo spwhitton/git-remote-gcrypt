@@ -200,16 +200,20 @@ make_new_repo()
 	# ascii-encoded string used for symmetric encryption with GnuPG.
 	local RECIPIENTS
 	echo_info "Setting up new repository at $URL"
+	RECIPIENTS="$(gpg --no-default-keyring --keyring "$CONF_KEYRING" \
+		--with-colons -k | xgrep ^pub | cut -f5 -d:)"
 	# Split recipients by space, example "a b c" =>  -R a -R b -R c
-	RECIPIENTS=$(git config gcrypt.recipients | sed -e 's/\([^ ]\+\)/-R &/g')
+	RECIPIENTS=$(printf "%s" $RECIPIENTS | sed -e 's/\([^ ]\+\)/-R &/g')
 	if [ -z "$RECIPIENTS" ]
 	then
-		echo_info "You must configure which GnuPG recipients can access the repository."
-		echo_info "To setup for all your git repositories, use::"
-		echo_info "  git config --global gcrypt.recipients KEYID"
+		echo_info "You must configure a keyring for the repository."
+		echo_info "Use ::"
+		echo_info "  gpg --export KEYID1 > <path-to-keyring>"
+		echo_info "  git config gcrypt.keyring <path-to-keyring>"
 		exit 1
 	fi
 	PUTREPO "$URL"
+	echo_info "Encrypting to \"$RECIPIENTS\""
 	echo_info "Generating new master key"
 	MASTERKEY="$(genkey)"
 	printf "%s" "$MASTERKEY" | \
@@ -220,6 +224,7 @@ read_config()
 {
 	CONF_SIGN_MANIFEST=$(git config --bool gcrypt.signmanifest || :)
 	CONF_REQUIRE_SIGN=$(git config --bool gcrypt.requiresign || :)
+	CONF_KEYRING=$(git config --path gcrypt.keyring || printf "/dev/null")
 }
 
 ensure_connected()
@@ -245,8 +250,13 @@ ensure_connected()
 	then
 		# Use gpg to verify and strip the signature
 		echo_info "Verifying manifest signature"
-		STRIPDATA="$(printf "%s" "$MANIFESTDATA" | gpg --batch || {
+		STRIPDATA="$(printf "%s" "$MANIFESTDATA" | \
+		gpg -q --no-default-keyring --keyring "$CONF_KEYRING" -d || {
 			echo_info "WARNING: Failed to verify signature from $URL"
+			echo_info "WARNING: Using keyring $CONF_KEYRING"
+			if [ "$CONF_KEYRING" = "/dev/null" ] ; then
+			echo_info "WARNING: Please configure gcrypt.keyring"
+			fi
 			if [ "$CONF_REQUIRE_SIGN" = "true" ] ; then
 			echo_info "Exiting per gcrypt.requiresign" && exit 1
 			fi
