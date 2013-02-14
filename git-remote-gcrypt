@@ -295,6 +295,7 @@ do_fetch()
 
 	printf "%s\n" "$PNEED" | while read PACKLINE
 	do
+		[ -z "$PACKLINE" ] && break
 		PACK=${PACKLINE#"$PACKPFX"}
 		RCVID="$(GET "$URL" "$PACK" | tee "$TMPPACK_ENCRYPTED" | pack_hash)"
 		if [ "$RCVID" != "$PACK" ]
