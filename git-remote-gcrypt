@@ -389,8 +389,7 @@ ensure_connected()
 	URL=${URL%"#$url_id"}
 	Repoid=$(xecho_n "$url_id" | pack_hash)
 
-	TmpManifest_Enc="$Localdir/manifest.$$"
-	trap 'rm -f "$TmpManifest_Enc"' EXIT
+	TmpManifest_Enc="$Localdir/tmp_manifest.$$"
 	GET "$URL" "$Repoid" "$TmpManifest_Enc" 2>/dev/null ||
 		echo_die "Repository not found: $url_id at $URL"
 
@@ -400,7 +399,6 @@ ensure_connected()
 		isnonnull "$manifest_" ||
 		echo_die "Failed to decrypt manifest!"
 	rm -f "$TmpManifest_Enc"
-	trap - EXIT
 
 	Branchlist=$(xecho "$manifest_" | xgrep -E '^[0-9a-f]{40} ')
 	Packlist=$(xecho "$manifest_" | xgrep "^$Packpfx")
@@ -529,7 +527,6 @@ do_fetch()
 	fi
 
 	TmpPack_Encrypted="$Localdir/tmp_pack_ENCRYPTED_.$$"
-	trap 'rm -f "$TmpPack_Encrypted"' EXIT
 
 	premote_=$(xecho "$Packlist" | cut -f 1-2 -d ' ')
 	# The `+` for $GITCEPTION is pointless but we will be safe for stacking
@@ -547,7 +544,6 @@ do_fetch()
 	done
 
 	rm -f "$TmpPack_Encrypted"
-	trap - EXIT
 	echo_git # end with blank line
 }
 
@@ -568,7 +564,6 @@ do_push()
 		make_new_repo
 	fi
 
-	trap 'rm -f "$TmpPack_Encrypted" "$TmpObjlist" "$TmpManifest_Enc"' EXIT
 	if isnonnull "$Branchlist"
 	then
 		# filter through batch-check to mark only the commits we have
@@ -623,7 +618,7 @@ EOF
 	echo_info "Participants are: $Signers"
 	echo_info "Requesting manifest signature"
 
-	TmpManifest_Enc="$Localdir/manifest.$$"
+	TmpManifest_Enc="$Localdir/tmp_manifest.$$"
 
 	(xecho "$Branchlist"; xecho "$Packlist"; xecho "$Keeplist";
 	repoidstr; xecho "$Extension_list") |
@@ -653,7 +648,6 @@ EOF
 	PUT_FINAL "$URL"
 
 	rm -f "$TmpManifest_Enc"
-	trap - EXIT
 
 	# ok all updates
 	xecho "$1" | while read line_
@@ -670,6 +664,8 @@ NAME=$1  # Remote name
 URL=$2   # Remote URL
 
 mkdir -p "$Localdir"
+
+trap 'rm -f "$Localdir/tmp_"*".$$"' EXIT 1 2 3 15
 
 while read Input
 do
