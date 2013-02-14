@@ -79,7 +79,7 @@ anon_commit()
 	GIT_AUTHOR_DATE="1356994801 -0400" GIT_COMMITTER_NAME="root" \
 	GIT_COMMITTER_EMAIL="root@localhost" \
 	GIT_COMMITTER_DATE="1356994801 -0400" \
-		git commit-tree -m x "$@"
+		git commit-tree -m "Initial commit" "$@"
 }
 
 # Get 'tree' from $1, change file $2 to obj id $3
