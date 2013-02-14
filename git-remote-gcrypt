@@ -23,6 +23,7 @@ pack_hash()
 LOCALDIR="${GIT_DIR:-.git}/remote-gcrypt"
 DID_FIND_REPO=  # yes for connected, no for no repo
 PACKPFX="pack :SHA224:"
+GREF="refs/gcrypt/togit"
 
 isurl() { test -z "${2%%$1://*}" ; }
 
@@ -36,6 +37,7 @@ splitcolon()
 # Fetch repo $1, file $2
 GET()
 {
+	local REPO
 	if isurl ssh "$1"
 	then
 		splitcolon "${1#ssh://}"
@@ -43,6 +45,14 @@ GET()
 	elif isurl sftp "$1"
 	then
 		(exec 0>&-; curl -s -S -k "$1/$2")
+	elif isurl gitception "$1"
+	then
+		REPO=${1#gitception://}
+		git fetch "$REPO" 2>/dev/null >&2 && \
+			OBJID=$(git ls-tree FETCH_HEAD | grep -E "\b$2$" | \
+				awk '{print $3}') && [ -n "$OBJID" ] && \
+			git cat-file blob "$OBJID"
+		git update-ref "$GREF" FETCH_HEAD
 	else
 		cat "$1/$2"
 	fi
@@ -51,9 +61,28 @@ GET()
 # Fetch repo $1, file $2 or return encrypted empty message
 GET_OR_EMPTY() { GET "$@" 2>/dev/null || (printf "" | ENCRYPT) ; }
 
+anon_commit()
+{
+	GIT_AUTHOR_NAME="root" GIT_AUTHOR_EMAIL="root@localhost" \
+	GIT_AUTHOR_DATE="1356994801 -0400" GIT_COMMITTER_NAME="root" \
+	GIT_COMMITTER_EMAIL="root@localhost" \
+	GIT_COMMITTER_DATE="1356994801 -0400" \
+		git commit-tree "$@"
+}
+
+# Get 'tree' from $1, change file $2 to obj id $3
+update_tree()
+{
+	# $2 is a filename from the repo format
+	(git ls-tree "$1" | grep -v -E "\b$2$";
+		printf "100644 blob %s\t%s" "$3" "$2") | git mktree
+}
+
 # Put repo $1, file $2 or fail
 PUT()
 {
+	local REPO
+
 	if isurl ssh "$1"
 	then
 		splitcolon "${1#ssh://}"
@@ -61,6 +90,14 @@ PUT()
 	elif isurl sftp "$1"
 	then
 		curl -s -S -k --ftp-create-dirs -T - "$1/$2"
+	elif isurl gitception "$1"
+	then
+		REPO=${1#gitception://}
+		OBJID=$(git hash-object -w --stdin) && \
+			TREEID=$(update_tree "$GREF" "$2" "$OBJID") &&
+			COMMITID=$(anon_commit "$TREEID" -m "x") && \
+			git push -f "$REPO" "$COMMITID":master && \
+			git update-ref "$GREF" "$COMMITID"
 	else
 		cat > "$1/$2"
 	fi
@@ -75,6 +112,10 @@ PUTREPO()
 		(exec 0>&- ; ssh "$prefix_" "mkdir -p $suffix_")
 	elif isurl sftp "$1"
 	then
+		:
+	elif isurl gitception "$1"
+	then
+		# FIXME
 		:
 	else
 		mkdir -p "$1"
@@ -345,8 +386,9 @@ do_push()
 # Main program, check $URL is supported
 NAME=$1
 URL=$2
-( isurl ssh "$URL" || isurl sftp "$URL" || test -z ${URL##/*} ) || \
-	{ echo_info "Supported URLs: Absolute path, sftp://, ssh://" ; exit 1 ; }
+( isurl ssh "$URL" || isurl sftp "$URL" || isurl gitception "$URL" || \
+	test -z ${URL##/*} ) || \
+	{ echo_info "Supported URLs: gitception://<giturl>, Absolute path, sftp://, ssh://" ; exit 1 ; }
 
 mkdir -p "$LOCALDIR"
 
