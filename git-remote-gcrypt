@@ -48,7 +48,7 @@ GET()
 	then
 		REPO=${1#gitception://}
 		git fetch "$REPO" 2>/dev/null >&2 && \
-			OBJID=$(git ls-tree FETCH_HEAD | grep -E "\b$2$" | \
+			OBJID=$(git ls-tree FETCH_HEAD | xgrep -E "\b$2$" | \
 				awk '{print $3}') && [ -n "$OBJID" ] && \
 			git cat-file blob "$OBJID"
 		git update-ref "$GREF" FETCH_HEAD
@@ -73,7 +73,7 @@ anon_commit()
 update_tree()
 {
 	# $2 is a filename from the repo format
-	(git ls-tree "$1" | grep -v -E "\b$2$";
+	(git ls-tree "$1" | xgrep -v -E "\b$2$";
 		printf "100644 blob %s\t%s" "$3" "$2") | git mktree
 }
 
@@ -164,6 +164,7 @@ append()
 	printf "%s\n" "$2"
 }
 
+xgrep() { command grep "$@" || : ; }
 sort_C() { LC_ALL=C command sort "$@"; }
 tac() { sed '1!G;h;$!d'; }
 echo_info() { echo "gcrypt:" "$@" >&2; }
@@ -229,8 +230,8 @@ ensure_connected()
 		)
 		[ -n "$STRIPDATA" ] && MANIFESTDATA=$STRIPDATA
 	fi
-	BRANCHLIST=$(printf "%s\n" "$MANIFESTDATA" | (grep -E '^[0-9a-f]{40}' || :))
-	PACKLIST=$(printf "%s\n" "$MANIFESTDATA" | (grep "^$PACKPFX" || :))
+	BRANCHLIST=$(printf "%s\n" "$MANIFESTDATA" | xgrep -E '^[0-9a-f]{40}')
+	PACKLIST=$(printf "%s\n" "$MANIFESTDATA" | xgrep "^$PACKPFX")
 }
 
 get_masterkey()
