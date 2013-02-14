@@ -177,7 +177,8 @@ CLEARSIGN()
 DECRYPT()
 {
 	(printf "%s" "$MASTERKEY" | \
-		gpg -q --batch --passphrase-fd 0 --output - -d /dev/fd/3) 3<&0
+		gpg -q --batch --no-default-keyring --keyring /dev/null \
+			--passphrase-fd 0 --output - -d /dev/fd/3) 3<&0
 }
 
 # Append $2 to $1 with a newline separator
