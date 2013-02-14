@@ -257,10 +257,14 @@ safe_git_rev_parse()
 
 check_recipients()
 {
-	Recipients="$(gpg --no-default-keyring --keyring "$Conf_keyring" \
-		--with-colons -k | xgrep ^pub | cut -f 5 -d ':' | tr '\n' ' ')"
-	# Split recipients by space, example "a b c" =>  -R a -R b -R c
-	Recipients=$(xecho_n "$Recipients" | sed -e 's/\([^ ]\+\)/-R &/g')
+	# Find which keys in the keyring we can encrypt to
+	Recipients=$(gpg --no-default-keyring --keyring "$Conf_keyring" \
+		--with-colons --fast-list -k | xgrep ^pub | \
+		while read rc_line; do
+			cap_=$(xecho "$rc_line" | cut -f 12 -d :)
+			keyid_=$(xecho "$rc_line" | cut -f 5 -d :)
+			iseq "${cap_#*E}" "$cap_" || xecho_n "-R $keyid_ "
+		done)
 	if isnull "$Recipients"
 	then
 		echo_info "You must configure a keyring for the repository."
