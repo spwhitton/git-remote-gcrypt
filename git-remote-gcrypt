@@ -184,6 +184,16 @@ CLEAN_FINAL()
 	isurl gitception "$1" && git update-ref -d "$Gref" || :
 }
 
+addsignkeyparam()
+{
+	if isnull "$Conf_signkey"; then
+		"$@"
+	else
+		"$@" -u "$Conf_signkey"
+	fi
+}
+
+
 ENCRYPT()
 {
 	gpg --batch --force-mdc --compress-algo none --passphrase-fd 3 -c 3<<EOF
@@ -202,7 +212,7 @@ EOF
 # Encrypt to recipients $1
 PRIVENCRYPT()
 {
-	gpg --no-default-keyring --keyring "$Conf_keyring" \
+	addsignkeyparam gpg --no-default-keyring --keyring "$Conf_keyring" \
 		--compress-algo none -se $1
 }
 
@@ -282,6 +292,7 @@ make_new_repo()
 read_config()
 {
 	Conf_keyring=$(git config --path gcrypt.keyring || xecho "/dev/null")
+	Conf_signkey=$(git config --path user.signingkey || :)
 }
 
 ensure_connected()

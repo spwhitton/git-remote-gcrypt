@@ -52,13 +52,15 @@ Configuration
     gpg --export KEYID1 > <path-to-keyring>
     git config gcrypt.keyring <path-to-keyring>
 
-  .. NOTE:: The user's gnupg configuration for encryption algorithms are used.
-            Check your keys and preferences, see `man gpg`.
+  .. NOTE:: GnuPG's configuration applies. Check your key and general
+            preferences, see `man gpg`.
 
 + All readers of the repository must have their pubkey included in
   the keyring used when pushing. All writers must have the complete
   set of pubkeys available. You can commit the keyring to the repo,
   further key management features do not yet exist.
+
++ gcrypt obeys `user.signingkey`
 
 
 Repository Format
