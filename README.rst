@@ -29,12 +29,11 @@ Quickstart
 
 Install as `git-remote-gcrypt` in `$PATH`.
 
-Configure a keyring:
+Configure the list of participant gpg keys:
 
     ::
 
-        gpg --export KEY1 KEY2 > $PWD/.git/keyring.gpg
-        git config --path gcrypt.keyring $PWD/.git/keyring.gpg
+        git config --global gcrypt.participants YOURKEYID
 
 Create an encrypted remote by pushing to it:
 
@@ -50,7 +49,7 @@ Create an encrypted remote by pushing to it:
         > To gcrypt::[...]
         > * [new branch]      master -> master
 
-Share the updated Repository URL with everyone in the keyring.
+Share the updated Repository URL with all participants.
 
 (The generated Repository ID is not secret, it only exists to ensure
 that two repositories signed by the same user can not be maliciously
@@ -68,16 +67,17 @@ evaluate how well we meet this design goal!
 Configuration
 =============
 
-*gcrypt.keyring*
-        Path to the GPG keyring file containing the public keys of all
-        participants. This file can be created using ``gpg --export``.
+*gcrypt.participants*
+        Space-separated list of GPG key identifiers. The remote is
+        encrypted to these participants and only signatures from these
+        are accepted. ``gpg -k`` lists all public keys you know.
 
-git-remote-gcrypt respects the variable *user.signingkey*.
+You should set *user.signingkey* if your default signing key is not part
+of the participant list.
 
 The encryption of the manifest is updated for each push. The pusher must
-have the public keys of all collaborators in the keyring.  You can
-commit the keyring to the repo, further key management features do not
-yet exist.
+have the public keys of all collaborators.  You can commit a keyring to
+the repo, further key management features do not yet exist.
 
 GPG configuration applies to public-key encryption, symmetric
 encryption, and signing. See `man gpg` for more information.
@@ -88,8 +88,7 @@ Examples
 
 ::
 
-    gpg --export YOURKEYID > $PWD/.git/keyring.gpg
-    git config gcrypt.keyring $PWD/.git/keyring.gpg
+    git config gcrypt.participants YOURKEYID
     git remote add cryptremote  gcrypt::ssh://example.com:repo
     git push cryptremote HEAD
 

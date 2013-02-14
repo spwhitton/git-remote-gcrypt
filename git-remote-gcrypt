@@ -23,6 +23,10 @@ Branchlist=
 Packlist=
 Extension_list=
 
+Recipients=
+Signers=
+Goodsig=
+
 # compat/utility functions
 xecho()
 {
@@ -232,19 +236,19 @@ EOF
 # Encrypt to recipients $1
 PRIVENCRYPT()
 {
-	addsignkeyparam gpg --no-default-keyring --keyring "$Conf_keyring" \
-		--compress-algo none -se $1
+	addsignkeyparam gpg --compress-algo none -se $1
 }
 
 PRIVDECRYPT()
 {
 	local status_=
 	exec 4>&1 &&
-	status_=$(gpg --no-default-keyring --keyring "$Conf_keyring" \
-		--status-fd 3 -q -d 3>&1 1>&4) &&
+	status_=$(gpg  --status-fd 3 -q -d 3>&1 1>&4) &&
 	xecho "$status_" | grep "^\[GNUPG:\] ENC_TO " >/dev/null &&
-	(xecho "$status_" | grep "^\[GNUPG:\] GOODSIG " >/dev/null || {
-		echo_info "Failed to verify manifest signature!" && return 1
+	(xecho "$status_" | grep -e "$Goodsig" >/dev/null || {
+		echo_info "Failed to verify manifest signature!" &&
+		echo_info "Only accepting signatories: ${Signers:-(none)}" &&
+		return 1
 	})
 }
 
@@ -267,26 +271,6 @@ safe_git_rev_parse()
 {
 	git cat-file --batch-check 2>/dev/null |
 		xgrep -v "missing" | cut -f 1 -d ' '
-}
-
-check_recipients()
-{
-	# Find which keys in the keyring we can encrypt to
-	Recipients=$(gpg --no-default-keyring --keyring "$Conf_keyring" \
-		--with-colons --fast-list -k | xgrep ^pub | \
-		while read rc_line; do
-			cap_=$(xecho "$rc_line" | cut -f 12 -d :)
-			keyid_=$(xecho "$rc_line" | cut -f 5 -d :)
-			iseq "${cap_#*E}" "$cap_" || xecho_n "-R $keyid_ "
-		done)
-	if isnull "$Recipients"
-	then
-		echo_info "You must configure a keyring for the repository."
-		echo_info "Use ::"
-		echo_info "  gpg --export KEYID1 > <path-to-keyring>"
-		echo_info "  git config gcrypt.keyring <path-to-keyring>"
-		exit 1
-	fi
 }
 
 make_new_repo()
@@ -314,8 +298,43 @@ make_new_repo()
 
 read_config()
 {
-	Conf_keyring=$(git config --path gcrypt.keyring || xecho "/dev/null")
+	local recp_= key_line= cap_= conf_keyring= conf_part=
 	Conf_signkey=$(git config --path user.signingkey || :)
+	conf_keyring=$(git config --path gcrypt.keyring || :)
+	conf_part=$(git config --get gcrypt.participants '.+' || :)
+
+	# Figure out which keys we should encrypt to or accept signatures from
+	if isnonnull "$conf_keyring" && isnull "$conf_part"
+	then
+		echo_info "WARNING: Setting gcrypt.keyring is deprecated," \
+			  "use gcrypt.participants instead."
+		conf_part=$(gpg --no-default-keyring --keyring "$conf_keyring" \
+		--with-colons --fast-list -k | grep ^pub | cut -f 5 -d :)
+	fi
+
+	for recp_ in $conf_part
+	do
+		key_line=$(gpg --with-colons --fast-list -k "$recp_" | xgrep ^pub)
+		keyid_=$(xecho "$key_line" | cut -f 5 -d :)
+
+		isnonnull "$keyid_" &&
+		Signers="$Signers $keyid_" &&
+		Goodsig=$(append "$Goodsig" "^\[GNUPG:\] GOODSIG $keyid_") || {
+			echo_info "WARNING: Skipping missing key $recp_"
+			continue
+		}
+		# Check 'E'ncrypt capability
+		cap_=$(xecho "$key_line" | cut -f 12 -d :)
+		iseq "${cap_#*E}" "$cap_" || Recipients="$Recipients -R $keyid_"
+	done
+
+	if isnull "$Recipients"
+	then
+		echo_info "You have not configured any keys to encrypt to for this repository"
+		echo_info "Use ::"
+		echo_info "  git config gcrypt.participants YOURKEYID"
+		exit 1
+	fi
 }
 
 ensure_connected()
@@ -347,15 +366,8 @@ ensure_connected()
 	Did_find_repo=yes
 	echo_info "Decrypting manifest"
 	manifest_=$(PRIVDECRYPT < "$TmpManifest_Enc") && 
-		isnonnull "$manifest_" || {
-		echo_info "Failed to decrypt manifest!"
-		echo_info "Using keyring $Conf_keyring"
-		if iseq "$Conf_keyring" "/dev/null"
-		then
-			echo_info "NOTE: Please configure gcrypt.keyring"
-		fi
-		exit 1
-	}
+		isnonnull "$manifest_" ||
+		echo_die "Failed to decrypt manifest!"
 	rm -f "$TmpManifest_Enc"
 	trap - EXIT
 
@@ -453,7 +465,6 @@ do_push()
 	del_hash=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 	ensure_connected
-	check_recipients
 
 	if iseq "$Did_find_repo" "no"
 	then
