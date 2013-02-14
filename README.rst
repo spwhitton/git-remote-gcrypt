@@ -143,9 +143,7 @@ Manifest file
     UXR3/R7awFCUJWYdzXzrlkk7E2Acxq/Y4EfEcd62AwGG
     repo :SHA224:5a191cea8c1021a95d813c4007c14f2cc987a40880c2f669430f1916 1
 
-+ `field<space>value`, extends until newline.
-
-+ `field` is one of `[0-9a-f]{40}`, `pack`, `repo`, `keep`, `extn`.
+Each item extends until newline, and matches one of the following forms:
 
   `[0-9a-f]{40} <gitref>`
       SHA-1 and its git ref
@@ -153,14 +151,14 @@ Manifest file
   `pack :<hashtype>:<hash> <key>`
       Packfile hash (`Hi`) and corresponding symmetric key (`Ki`).
 
+  `keep :<hashtype>:<hash> <generation>`
+      Packfile hash and its repack generation
+
   `repo :<hashtype>:<hash> <version>`
       The hash of the repository id.
 
-  `extn ...`
+  `extn <name> ...`
       Extension field, preserved but unused.
-
-  `keep ...`
-      TBD.
 
 
 Yet to be Implemented
