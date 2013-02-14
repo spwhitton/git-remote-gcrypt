@@ -147,7 +147,6 @@ Yet to be Implemented
 .....................
 
 + Repacking the remote repository
-+ Deleting remote refs
 + Some kind of simple keyring management
 
 See Also

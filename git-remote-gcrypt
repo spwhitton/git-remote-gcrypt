@@ -433,6 +433,7 @@ do_push()
 	# file's hash. The manifest is updated with the pack id.
 	# The manifest is encrypted.
 	local remote_has= remote_want= prefix_= suffix_= line_= pack_id= key_=
+	del_hash=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 	ensure_connected
 	check_recipients
@@ -459,13 +460,15 @@ do_push()
 			Branchlist=$(append "$Branchlist" \
 				"$(safe_git_rev_parse "$prefix_") $suffix_")
 		else
-			:  # FIXME delete branch
+			# Mark branch for deletion
+			Branchlist=$(append "$Branchlist" "$del_hash $suffix_")
 		fi
 	done <<EOF
 $1
 EOF
 
-	Branchlist=$(xecho "$Branchlist" | sort_stable_k2 | tac | uniq -s 40)
+	Branchlist=$(xecho "$Branchlist" | sort_stable_k2 | tac | uniq -s 40 |
+		xgrep -v "^$del_hash")
 
 	TmpPack_Encrypted="$Localdir/tmp_pack_ENCRYPTED_.$$"
 	TmpObjlist="$Localdir/tmp_packrevlist.$$"
@@ -505,17 +508,12 @@ EOF
 	rm -f "$TmpManifest_Enc"
 	trap - EXIT
 
-	# ok all updates (not deletes)
+	# ok all updates
 	xecho "$1" | while read line_
 	do
 		# +src:dst -- remove leading + then split at :
 		splitcolon "${line_#+}"
-		if isnull "$prefix_"
-		then
-			echo_git "error $suffix_ delete not supported yet"
-		else
-			echo_git "ok $suffix_"
-		fi
+		echo_git "ok $suffix_"
 	done
 	
 	echo_git 
