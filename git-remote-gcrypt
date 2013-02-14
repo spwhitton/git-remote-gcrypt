@@ -4,11 +4,7 @@
 # Copyright 2013  by Ulrik
 # License: GPLv2 or any later version, see http://www.gnu.org/licenses/
 #
-# Requires GnuPG
-#
-# We read git config gcrypt.recipients when creating new repositories
-#         git config gcrypt.signmanifest
-#         git config gcrypt.requiresign
+# See README
 
 #set -x
 set -e

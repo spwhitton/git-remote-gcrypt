@@ -1,10 +1,12 @@
 # git-remote-gcrypt
 # Copyright 2013  by Ulrik
 # License: GPLv2 or any later version, see http://www.gnu.org/licenses/
-#
-# Requires GnuPG
-#
-# We read `git config gcrypt.recipients` when creating new repositories
+# Use GnuPG to use encrypted git remotes
+
+WARNING: This is a proof of concept
+WARNING: Repository format WILL change, incompatibly
+
+INTRODUCTION
 
 Install as `git-remote-gcrypt` in $PATH
 
@@ -14,5 +16,45 @@ Supports local, ssh:// and sftp:// remotes at the moment::
     git remote add gcryptrepo gcrypt::ssh://hostname.com:MyNewRepo
     git push --all gcryptrepo
 
-WARNING: This is a proof of concept
-WARNING: Repository format WILL change, incompatibly
+CONFIGURATION
+
+ * Repository read access is set up from `git config gcrypt.recipients`
+   when creating new repositories.
+
+ * Set `git config gcrypt.signmanifest` to apply your signature to the
+   manifest when pushing.
+ * Set `git config gcrypt.requiresign` to always fail and stop if no
+   valid signature is found on the manifest.
+ 
+ * NOTE: We use the users gnupg configuration for cipher-algo and so on!
+         Configure your gnupg to use a strong crypto -- see `man gpg`.
+
+
+REPOSITORY FORMAT
+
+ * masterkey is encrypted-to all gcrypt.recipients using `gpg -e`
+ * manifest contains the branches and the pack list
+
+    $ cd MyCryptedRemote
+    $ ls 
+    -rw-- 11K 00ef27cc2c5b76365e1a46479ed7429e16572c543cdff0a8bf745c7c
+    -rw-- 41K b934d8d6c0f48e71b9d7a4d5ea56f024a9bed4f6f2c6f8e688695bee
+    -rw-- 577 manifest
+    -rw-- 495 masterkey
+    
+    $ gpg -d masterkey | gpg --passphrase-fd 0 -d manifest 
+    -----BEGIN PGP SIGNED MESSAGE-----
+    Hash: SHA576
+    
+    b4a4a39365d19282810c19d0f3f24d04dd2d179f refs/tags/something
+    1d323ddadf4cf1d80fced447e637ab3766b168b7 refs/heads/master
+    pack :SHA224:00ef27cc2c5b76365e1a46479ed7429e16572c543cdff0a8bf745c7c
+    pack :SHA224:b934d8d6c0f48e71b9d7a4d5ea56f024a9bed4f6f2c6f8e688695bee
+    -----BEGIN PGP SIGNATURE-----
+    Version: GnuPG v1.4.12 (GNU/Linux)
+    
+    XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+    XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+    XXXXX
+    -----END PGP SIGNATURE-----
+
