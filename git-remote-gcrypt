@@ -398,8 +398,8 @@ do_fetch()
 	# Needed packs is  Packlist - (phave & Packlist)
 	# The `+` for $GITCEPTION is pointless but we will be safe for stacking
 	phave_="$(cat "$Localdir/have_packs+" 2>/dev/null || :)"
-	pboth_="$( (xecho "$premote_"; xecho "$phave_") | sort_C | uniq -d)"
-	pneed_="$( (xecho "$premote_"; xecho "$pboth_") | sort_C | uniq -u)"
+	pboth_="$(xecho "$premote_" | xgrep -F  -x -e "$phave_")"
+	pneed_="$(xecho "$premote_" | xgrep -F -vx -e "$phave_")"
 
 	xecho "$pneed_" | while read packline_
 	do
