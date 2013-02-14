@@ -170,8 +170,9 @@ PRIVENCRYPT()
 PRIVDECRYPT()
 {
 	local STATUS
+	exec 4>&1 &&
 	STATUS=$(gpg --no-default-keyring --keyring "$CONF_KEYRING" \
-		--status-fd 3 -q -d 3>&1 1>&4) 4>&1 &&
+		--status-fd 3 -q -d 3>&1 1>&4) &&
 	printf "%s" "$STATUS" | grep "^\[GNUPG:\] ENC_TO " >/dev/null &&
 	(printf "%s" "$STATUS" | grep "^\[GNUPG:\] GOODSIG " >/dev/null || {
 		echo_info "Failed to verify manifest signature!" && return 1
@@ -283,7 +284,7 @@ ensure_connected()
 		exit 1
 	}
 	rm -f "$TMPMANIFEST_ENC"
-	trap EXIT
+	trap 0
 	MASTERKEY=$(printf "%s\n" "$MANIFEST" | head -n 1)
 	BRANCHLIST=$(printf "%s\n" "$MANIFEST" | xgrep -E '^[0-9a-f]{40} ')
 	PACKLIST=$(printf "%s\n" "$MANIFEST" | xgrep "^$PACKPFX")
@@ -362,7 +363,7 @@ do_fetch()
 	done
 
 	rm -f "$TMPPACK_ENCRYPTED"
-	trap EXIT
+	trap 0
 	echo # end with blank line
 }
 
@@ -428,7 +429,7 @@ do_push()
 	rm -f "$TMPPACK_ENCRYPTED"
 	rm -f "$TMPMANIFEST"
 	rm -f "$TMPOBJLIST"
-	trap EXIT
+	trap 0
 
 	# Update manifest
 	echo_info "Encrypting manifest to \"$RECIPIENTS\""
@@ -444,7 +445,7 @@ do_push()
 	PUT_FINAL "$URL"
 
 	rm -f "$TMPMANIFEST_ENC"
-	trap EXIT
+	trap 0
 
 	# ok all updates (not deletes)
 	printf "%s\n" "$1" | while read LINE
