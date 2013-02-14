@@ -319,7 +319,7 @@ ensure_connected()
 		exit 1
 	}
 	rm -f "$TmpManifest_Enc"
-	trap 0
+	trap - EXIT
 
 	Masterkey=$(xecho "$manifest_" | head -n 1)
 	Branchlist=$(xecho "$manifest_" | xgrep -E '^[0-9a-f]{40} ')
@@ -399,7 +399,7 @@ do_fetch()
 	done
 
 	rm -f "$TmpPack_Encrypted"
-	trap 0
+	trap - EXIT
 	echo_git # end with blank line
 }
 
@@ -462,7 +462,7 @@ EOF
 
 	rm -f "$TmpPack_Encrypted"
 	rm -f "$TmpObjlist"
-	trap 0
+	trap - EXIT
 
 	# Update manifest
 	echo_info "Encrypting manifest to \"$Recipients\""
@@ -482,7 +482,7 @@ EOF
 	PUT_FINAL "$URL"
 
 	rm -f "$TmpManifest_Enc"
-	trap 0
+	trap - EXIT
 
 	# ok all updates (not deletes)
 	xecho "$1" | while read line_
