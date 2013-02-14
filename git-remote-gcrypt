@@ -24,6 +24,7 @@ sha1()
 
 LOCALDIR="${GIT_DIR:-.git}/remote-gcrypt"
 DUMMYKEY="00000000000000000000"
+DID_CONNECT=
 
 isurl() { test -z "${2%%$1://*}" ; }
 
@@ -122,6 +123,17 @@ make_new_repo()
 	printf "%s" "$MASTERKEY" | gpg -e $RECIPIENTS | PUT "$URL" masterkey
 }
 
+ensure_connected()
+{
+	if [ ! -z "$DID_CONNECT" ]
+	then
+		return
+	fi
+	DID_CONNECT=1
+	MASTERKEY="$(get_masterkey)"
+	MANIFESTDATA="$(GET_OR_EMPTY "$URL" manifest | DECRYPT)"
+}
+
 get_masterkey()
 {
 	(GET "$URL" masterkey 2>/dev/null || : ) | \
@@ -139,6 +151,8 @@ do_list()
 {
 	local OBJID
 	local REFNAME
+	ensure_connected
+
 	printf "%s\n" "$MANIFESTDATA" | while read LINE
 	do
 		OBJID=${LINE%% *}
@@ -164,6 +178,8 @@ do_fetch()
 	local PREMOTE
 	local PBOTH
 	local PHAVE
+	ensure_connected
+
 	touch "$LOCALDIR/packfest"
 	PREMOTE="$(GET_OR_EMPTY "$URL" packfest | DECRYPT)"
 	if [ -z "$PREMOTE" ]
@@ -211,6 +227,7 @@ do_push()
 	local PACKFEST
 	local prefix_
 	local suffix_
+	ensure_connected
 
 	if [ "$MASTERKEY" = "$DUMMYKEY" ]
 	then
@@ -292,8 +309,6 @@ URL=$2
 	{ echo_info "Supported URLs: Absolute path, sftp://, ssh://" ; exit 1 ; }
 
 mkdir -p "$LOCALDIR"
-MASTERKEY="$(get_masterkey)"
-MANIFESTDATA="$(GET_OR_EMPTY "$URL" manifest | DECRYPT)"
 
 while read INPUT
 do
