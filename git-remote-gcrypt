@@ -42,8 +42,7 @@ xgrep() { command grep "$@" || : ; }
 sort_C() { LC_ALL=C command sort "$@"; }
 sort_stable_k2()
 {
-	awk '{ printf("%08d %s\n", NR, $0) }' | sort_C -k3,3 -k1,1 |
-		awk '{ print $2 " " $3 }'
+	awk '{ printf("%08d\t%s\n", NR, $0) }' | sort_C -k3,3 -k1,1 | cut -f 2-
 }
 
 tac() { sed '1!G;h;$!d'; }
