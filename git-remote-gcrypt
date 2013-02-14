@@ -115,6 +115,7 @@ make_new_repo()
 	# ascii-encoded string used for symmetric encryption with GnuPG.
 	local RECIPIENTS
 	echo_info "Setting up new repository at $URL"
+	# Split recipients by space, example "a b c" =>  -R a -R b -R c
 	RECIPIENTS=$(git config gcrypt.recipients | sed -e 's/\([^ ]\+\)/-R &/g')
 	if [ -z "$RECIPIENTS" ]
 	then
