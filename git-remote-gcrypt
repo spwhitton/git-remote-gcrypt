@@ -90,7 +90,7 @@ ENCRYPT()
 	# Symmetric encryption using the long MASTERKEY. We use AES
 	# and OpenPGP's modification detection code (mdc).
 	(printf "%s" "$MASTERKEY" | \
-		gpg --batch --force-mdc --cipher-algo AES --compress-algo none \
+		gpg --batch --force-mdc --compress-algo none \
 			--passphrase-fd 0 --output - -c /dev/fd/3) 3<&0
 }
 
