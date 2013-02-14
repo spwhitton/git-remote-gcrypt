@@ -29,7 +29,7 @@ echo_git() { xecho "$@" ; }  # Code clarity
 echo_info() { xecho "gcrypt:" "$@" >&2; }
 echo_die() { echo_info "$@" ; exit 1; }
 
-isnull() { [ 0 = "${#1}" ]; }
+isnull() { case "${1}" in "") true;; *) false;; esac; }
 isnonnull() { ! isnull "$1"; }
 iseq() { isnull "${1#"$2"}"; }
 isnoteq() { ! iseq "$@"; }
