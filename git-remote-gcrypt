@@ -7,6 +7,8 @@
 # Requires GnuPG
 #
 # We read git config gcrypt.recipients when creating new repositories
+#         git config gcrypt.signmanifest
+#         git config gcrypt.requiresign
 
 #set -x
 set -e
@@ -92,6 +94,17 @@ ENCRYPT()
 			--passphrase-fd 0 --output - -c /dev/fd/3) 3<&0
 }
 
+CLEARSIGN()
+{
+	if [ "$CONF_SIGN_MANIFEST" = "true" ]
+	then
+		echo_info "Signing new manifest"
+		gpg --output - --clearsign
+	else
+		cat
+	fi
+}
+
 DECRYPT()
 {
 	(printf "%s" "$MASTERKEY" | \
@@ -131,15 +144,24 @@ make_new_repo()
 		gpg --compress-algo none -e $RECIPIENTS | PUT "$URL" masterkey
 }
 
+read_config()
+{
+	CONF_SIGN_MANIFEST=$(git config --bool gcrypt.signmanifest || :)
+	CONF_REQUIRE_SIGN=$(git config --bool gcrypt.requiresign || :)
+}
+
 ensure_connected()
 {
 	local MANIFESTDATA
+	local STRIPDATA
 
 	if [ -n "$DID_FIND_REPO" ]
 	then
 		return
 	fi
 	DID_FIND_REPO=yes
+	read_config
+
 	MASTERKEY="$(get_masterkey)"
 	if [ -z "$MASTERKEY" ]
 	then
@@ -147,6 +169,19 @@ ensure_connected()
 		return
 	fi
 	MANIFESTDATA="$(GET_OR_EMPTY "$URL" manifest | DECRYPT)"
+	if [ -n "$MANIFESTDATA" -a \( "$CONF_REQUIRE_SIGN" = true -o \
+		-z "${MANIFESTDATA##-----BEGIN*}" \) ]
+	then
+		# Use gpg to verify and strip the signature
+		echo_info "Verifying manifest signature"
+		STRIPDATA=$(printf "%s" "$MANIFESTDATA" | gpg || {
+		echo_info "WARNING: Failed to verify signature from $URL"
+		[ "$CONF_REQUIRE_SIGN" = "true" ] && \
+			echo_info "Exiting per gcrypt.requiresign" && exit 1
+		}
+		)
+		[ -n "$STRIPDATA" ] && MANIFESTDATA=$STRIPDATA
+	fi
 	BRANCHLIST=$(printf "%s\n" "$MANIFESTDATA" | (grep -E '^[0-9a-f]{40}' || :))
 	PACKLIST=$(printf "%s\n" "$MANIFESTDATA" | (grep '^pack ' || :))
 }
@@ -239,7 +274,6 @@ do_push()
 	# The manifest is encrypted.
 	local REMOTEHAS
 	local REMOTEWANT
-	local MANIFESTDATA
 	local prefix_
 	local suffix_
 	ensure_connected
@@ -287,8 +321,9 @@ do_push()
 		PUT "$URL" "$PACKID" < "$TMPPACK_ENCRYPTED"
 	fi
 
-	MANIFESTDATA=$(printf "%s\n%s\n" "$BRANCHLIST" "$PACKLIST")
-	printf "%s\n" "$MANIFESTDATA" | ENCRYPT | PUT "$URL" "manifest"
+	# Put new manifest
+	printf "%s\n%s\n" "$BRANCHLIST" "$PACKLIST" | \
+		CLEARSIGN | ENCRYPT | PUT "$URL" "manifest"
 
 	# ok all updates (not deletes)
 	printf "%s\n" "$1" | while read LINE
