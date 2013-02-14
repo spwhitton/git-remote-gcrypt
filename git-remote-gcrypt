@@ -18,10 +18,14 @@ Repoid=
 Packkey_bytes=33  # 33 random bytes for passphrase, still compatible if changed
 Hashtype=SHA224   # incompatible if changed
 Packpfx="pack :${Hashtype}:"
+Keeppfx="keep :${Hashtype}:"
 
 Branchlist=
 Packlist=
+Keeplist=
 Extension_list=
+Repack_limit=25
+Packlist_delete=
 
 Recipients=
 Signers=
@@ -112,6 +116,17 @@ gitception_put()
 		git update-ref "$Gref" "$commit_id"
 }
 
+# Remove giturl $1, file $2
+# depends on previous GET like put
+gitception_remove()
+{
+	local tree_id= commit_id= tab_="	"
+	# $2 is a filename from the repo format
+	tree_id=$(git ls-tree "$Gref" | xgrep -v -E '\b'"$2"'$' | git mktree) &&
+		commit_id=$(anon_commit "$tree_id") &&
+		git update-ref "$Gref" "$commit_id"
+}
+
 gitception_new_repo()
 {
 	local empty_tree=4b825dc642cb6eb9a060e54bf8d69288fbee4904
@@ -195,6 +210,32 @@ PUTREPO()
 		mkdir -p "$1"
 	else
 		gitception_new_repo "${1#gitception://}"
+	fi
+}
+
+# For repo $1, delete all newline-separated files in $2
+REMOVE()
+{
+	local fn_=
+	if isurl ssh "$1"
+	then
+		splitcolon "${1#ssh://}"
+		(exec 0>&- ; ssh "$prefix_" "cd $suffix_; rm $2")
+	elif isurl sftp "$1"
+	then
+		# FIXME
+		echo_info "sftp: Ignore remove request $1/$2"
+	elif isurl rsync "$1"
+	then
+		xecho "$2" | rsync -I -W -v -r --delete --include-from=- \
+			--exclude='*' "$Localdir"/ "${1#rsync://}/" >&2
+	elif islocalrepo "$1"
+	then
+		(cd "$1"; rm $2)
+	else
+		for fn_ in $2; do
+			gitception_remove "${1#gitception://}" "$fn_"
+		done
 	fi
 }
 
@@ -372,9 +413,81 @@ ensure_connected()
 
 	Branchlist=$(xecho "$manifest_" | xgrep -E '^[0-9a-f]{40} ')
 	Packlist=$(xecho "$manifest_" | xgrep "^$Packpfx")
+	Keeplist=$(xecho "$manifest_" | xgrep "^keep")
 	Extension_list=$(xecho "$manifest_" | xgrep "^extn ")
 	rcv_repoid=$(xecho "$manifest_" | xgrep "^repo ")
 	iseq "$(repoidstr)" "$rcv_repoid" || echo_die "Repository id mismatch!"
+}
+
+# $1 is new pack id $2 key
+# set did_repack=yes if repacked
+repack_if_needed()
+{
+	local pack_= rcv_id= packline_= premote_= key_= pkeep_= n_=
+
+	# $TmpPack_Encrypted set in caller
+
+	did_repack=no
+	isnonnull "$Packlist" || return 0
+
+	premote_=$(xecho "$Packlist" | cut -f 1-2 -d ' ')
+	pkeep_=$(xecho "$Keeplist" | cut -f 2 -d ' ')
+
+	if isnull "$pkeep_"; then
+		n_=$(xecho "$Packlist" | wc -l)
+	else
+		n_=$(xecho "$Packlist" | grep -v -F -e "$pkeep_" | wc -l)
+	fi
+	if [ $Repack_limit -gt "$n_" ]; then
+		return
+	fi
+	echo_info "Repacking remote $NAME, ..."
+
+	rm -r -f "$Localdir/pack"
+	mkdir -p "$Localdir/pack"
+	DECRYPT "$2" < "$TmpPack_Encrypted" |
+		git index-pack -v --stdin "$Localdir/pack/${1}.pack" >/dev/null
+
+	xecho "$premote_" | while read packline_
+	do
+		isnonnull "$packline_" || continue
+		if isnonnull "$pkeep_" &&
+			xecho "$packline_" | grep -q -F -e "$pkeep_"
+		then
+			continue
+		fi
+		pack_=${packline_#"$Packpfx"}
+		GET "$URL" "$pack_" "$TmpPack_Encrypted"
+		rcv_id=$(pack_hash < "$TmpPack_Encrypted")
+		if isnoteq "$rcv_id" "$pack_"
+		then
+			echo_die "Packfile $pack_ does not match digest!"
+		fi
+		key_=$(xecho "$Packlist" | grep "$pack_" | cut -f 3 -d ' ')
+		DECRYPT "$key_" < "$TmpPack_Encrypted" |
+		git index-pack -v --stdin "$Localdir/pack/${pack_}.pack" >/dev/null
+	done
+	key_=$(genkey "$Packkey_bytes")
+
+	git verify-pack -v "$Localdir"/pack/*.idx | grep -E '^[0-9a-f]{40}' |
+		cut -f 1 -d ' ' |
+		GIT_ALTERNATE_OBJECT_DIRECTORIES=$Localdir \
+		git pack-objects --stdout | ENCRYPT "$key_" > "$TmpPack_Encrypted"
+
+	# Truncate packlist to only the kept packs
+	if isnull "$pkeep_"; then
+		Packlist_delete=$premote_
+		Packlist=
+	else
+		Packlist_delete=$(xecho "$premote_" | xgrep -v -F -e "$pkeep_")
+		Packlist=$(xecho "$Packlist" | xgrep -F -e "$pkeep_")
+	fi
+
+	pack_id=$(pack_hash < "$TmpPack_Encrypted")
+	Packlist=$(append "$Packlist" "$Packpfx$pack_id $key_")
+	Keeplist=$(append "$Keeplist" "$Keeppfx$pack_id 1")
+	rm -r -f "$Localdir/pack"
+	did_repack=yes
 }
 
 do_capabilities()
@@ -510,7 +623,15 @@ EOF
 	if [ -s "$TmpObjlist" ]
 	then
 		pack_id=$(pack_hash < "$TmpPack_Encrypted")
-		Packlist=$(append "$Packlist" "$Packpfx$pack_id $key_")
+		did_repack=
+		repack_if_needed "$pack_id" "$key_"
+
+		if isnoteq "$did_repack" yes
+		then
+			Packlist=$(append "$Packlist" "$Packpfx$pack_id $key_")
+		fi
+		# else, repack rewrote Packlist
+
 	fi
 
 	# Generate manifest
@@ -519,7 +640,7 @@ EOF
 
 	TmpManifest_Enc="$Localdir/manifest.$$"
 
-	(xecho "$Branchlist"; xecho "$Packlist";
+	(xecho "$Branchlist"; xecho "$Packlist"; xecho "$Keeplist";
 	repoidstr; xecho "$Extension_list") |
 		PRIVENCRYPT "$Recipients" > "$TmpManifest_Enc"
 
@@ -533,6 +654,16 @@ EOF
 
 	# Upload manifest
 	PUT "$URL" "$Repoid" "$TmpManifest_Enc"
+
+	# Delete packs
+	if isnonnull "$Packlist_delete"; then
+		REMOVE "$URL" "$(xecho "$Packlist_delete" | while read packline_
+		do
+			isnonnull "$packline_" || continue
+			pack_=${packline_#"$Packpfx"}
+			xecho "$pack_"
+		done)"
+	fi
 
 	PUT_FINAL "$URL"
 
