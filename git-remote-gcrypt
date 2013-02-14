@@ -147,7 +147,7 @@ ensure_connected()
 		return
 	fi
 	MANIFESTDATA="$(GET_OR_EMPTY "$URL" manifest | DECRYPT)"
-	BRANCHLIST=$(printf "%s\n" "$MANIFESTDATA" | (grep -v '^pack ' || :))
+	BRANCHLIST=$(printf "%s\n" "$MANIFESTDATA" | (grep -E '^[0-9a-f]{40}' || :))
 	PACKLIST=$(printf "%s\n" "$MANIFESTDATA" | (grep '^pack ' || :))
 }
 
