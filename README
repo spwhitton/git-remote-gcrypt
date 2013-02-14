@@ -16,19 +16,25 @@ as well as the special gitception://<giturl> remote type::
     git config --global gcrypt.recipients KEYID1
     git remote add gcryptrepo gcrypt::ssh://hostname.com:MyNewRepo
      ( or maybe:
-       git remote add gcryptrepo gcrypt::gitception://git@github.com/Secrets
-       )
+       git remote add gcryptrepo gcrypt::gitception://git://host.com/repo.git
+     )
     git push --all gcryptrepo
 
 CONFIGURATION
 
- * Repository read access is set up from `git config gcrypt.recipients`
-   when creating new repositories.
+ * You must set up a small gpg keyring for the repository::
 
- * Set `git config gcrypt.signmanifest` to apply your signature to the
-   manifest when pushing.
- * Set `git config gcrypt.requiresign` to always fail and stop if no
-   valid signature is found on the manifest.
+     gpg --export KEYID1 > <path-to-keyring>
+     git config gcrypt.keyring <path-to-keyring>
+
+   New repositories will be created to allow access for the keys in
+   `gcrypt.keyring`. The keyring is used to verify the authenticity of the
+   repository when it is read or written to.
+
+ * Set `git config gcrypt.signmanifest 1` to also sign the manifest (the
+   list of branches and packfiles) when pushing.
+ * Set `git config gcrypt.requiresign 1` to fail and stop if no valid
+   signature is found on the manifest.
  
  * NOTE: We use the users gnupg configuration for cipher-algo and so on!
          Configure your gnupg to use a strong crypto -- see `man gpg`.
@@ -36,8 +42,9 @@ CONFIGURATION
 
 REPOSITORY FORMAT
 
- * masterkey is encrypted-to all gcrypt.recipients using `gpg -e`
- * manifest contains the branches and the pack list
+ * masterkey is first signed, then encrypted using `gpg -e` with hidden
+   recipients
+ * manifest contains the branches and the list of packfiles
 
     $ cd MyCryptedRemote
     $ ls 
@@ -48,7 +55,7 @@ REPOSITORY FORMAT
     
     $ gpg -d masterkey | gpg --passphrase-fd 0 -d manifest 
     -----BEGIN PGP SIGNED MESSAGE-----
-    Hash: SHA576
+    Hash: SHA512
     
     b4a4a39365d19282810c19d0f3f24d04dd2d179f refs/tags/something
     1d323ddadf4cf1d80fced447e637ab3766b168b7 refs/heads/master
