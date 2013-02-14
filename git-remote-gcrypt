@@ -16,7 +16,6 @@ Gref="refs/gcrypt/gitception$GITCEPTION"
 Gref_rbranch="refs/heads/master"
 Repoid=
 Hashpfx=":SHA224:"
-UrlTag="G."
 Packpfx="pack $Hashpfx"
 Packkey_bytes=33
 
@@ -304,10 +303,10 @@ make_new_repo()
 	Repoid=$(xecho_n "$urlid_" | pack_hash)
 	echo_info "Repository ID  is" "$urlid_"
 	iseq "${NAME#gcrypt::}" "$URL" || {
-		git config "remote.$NAME.url" "gcrypt::$URL/$UrlTag$urlid_"
+		git config "remote.$NAME.url" "gcrypt::$URL#$urlid_"
 		fix_config=1
 	}
-	echo_info "Repository URL is" "gcrypt::$URL/$UrlTag$urlid_"
+	echo_info "Repository URL is" "gcrypt::$URL#$urlid_"
 	Extension_list=$(xecho "extn comment")
 	isnull "$fix_config" || echo_info "(configuration for $NAME updated)"
 }
@@ -330,11 +329,14 @@ ensure_connected()
 	Did_find_repo=no
 	read_config
 
-	# split out Repoid from URL
-	url_id=${URL##*/"$UrlTag"}
-	isnoteq "$url_id" "$URL" || return 0
-
-	URL=${URL%/"$UrlTag$url_id"}
+	# split out Repo ID from URL
+	url_id=${URL##*"#"}
+	isnoteq "$url_id" "$URL" || {
+		url_id=${URL##*/"G."}
+		isnoteq "$url_id" "$URL" || return 0
+		URL=${URL%/"G.$url_id"}
+	}
+	URL=${URL%"#$url_id"}
 	Repoid=$(xecho_n "$url_id" | pack_hash)
 
 	TmpManifest_Enc="$Localdir/manifest.$$"

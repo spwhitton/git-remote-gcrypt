@@ -44,7 +44,7 @@ Create an encrypted remote by pushing to it:
         git push cryptremote master
         > gcrypt: Setting up new repository at ssh://example.com:repo
         > gcrypt: Repository ID  is KNBr0wKzct52
-        > gcrypt: Repository URL is gcrypt::ssh://example.com:repo/G.KNBr0wKzct52
+        > gcrypt: Repository URL is gcrypt::ssh://example.com:repo#KNBr0wKzct52
         > gcrypt: (configuration for cryptremote updated)
         > [ more lines .. ]
         > To gcrypt::[...]
