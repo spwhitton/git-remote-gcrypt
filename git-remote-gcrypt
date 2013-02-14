@@ -249,10 +249,8 @@ pack_hash()
 # Pass the branch/ref by pipe to git
 safe_git_rev_parse()
 {
-	local out_=
-	out_=$(xecho "$1" | git cat-file --batch-check)
-	out_=${out_%%*missing}
-	xecho "${out_%% *}"
+	git cat-file --batch-check 2>/dev/null |
+		xgrep -v "missing" | cut -f 1 -d ' '
 }
 
 check_recipients()
@@ -446,8 +444,9 @@ do_push()
 	trap 'rm -f "$TmpPack_Encrypted" "$TmpObjlist"' EXIT
 	if isnonnull "$Branchlist"
 	then
-		remote_has=$(xecho "$Branchlist" |
-			cut -f 1 -d ' ' | sed -e 's/^\(.\)/^&/')
+		# filter through batch-check to mark only the commits we have
+		remote_has=$(xecho "$Branchlist" | cut -f 1 -d ' ' |
+			safe_git_rev_parse | sed -e 's/^\(.\)/^&/')
 	fi
 
 	while read line_ # from <<
@@ -458,7 +457,7 @@ do_push()
 		then
 			remote_want=$(append "$remote_want" "$prefix_")
 			Branchlist=$(append "$Branchlist" \
-				"$(safe_git_rev_parse "$prefix_") $suffix_")
+			"$(xecho "$prefix_" | safe_git_rev_parse) $suffix_")
 		else
 			# Mark branch for deletion
 			Branchlist=$(append "$Branchlist" "$del_hash $suffix_")
