@@ -16,9 +16,10 @@ Remote helper programs are invoked by git to handle network transport.
 This helper handles gcrypt:: URLs that will access a remote repository
 encrypted with GPG, using our custom format.
 
-Supported locations are `local`, `ssh://`, `sftp://` and
-`gitception://`. `gcrypt::gitception://<giturl>` allows stacking gcrypt
-on top of any other git transport.
+Supported locations are `local`, `ssh://` and `sftp://`, where the
+repository is stored as a set of files. If the location instead is any
+`<giturl>`, gcrypt will store the same representation in a git
+repository, and so it can be bridged over any git transport.
 
 .. NOTE:: Repository format MAY STILL change, incompatibly
 
@@ -90,6 +91,13 @@ Examples
     git config gcrypt.keyring $PWD/.git/keyring.gpg
     git remote add cryptremote  gcrypt::ssh://example.com:repo
     git push cryptremote HEAD
+
+How to use a git backend::
+
+    # notice that the target repo must already exist and its
+    # `master` branch will be overwritten!
+    git remote add gitcrypt gcrypt::git@example.com:repo
+    git push gitcrypt HEAD
 
 Notes
 =====

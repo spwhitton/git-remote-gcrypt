@@ -44,6 +44,7 @@ isnoteq() { ! iseq "$@"; }
 # Append $2 to $1 with a newline separator
 append() { isnull "$1" || xecho "$1" && xecho "$2"; }
 isurl() { isnull "${2%%$1://*}"; }
+islocalrepo() { isnull "${1##/*}" && [ ! -e "$1/HEAD" ]; }
 
 xgrep() { command grep "$@" || : ; }
 sort_C() { LC_ALL=C command sort "$@"; }
@@ -83,7 +84,9 @@ anon_commit()
 	GIT_AUTHOR_DATE="1356994801 -0400" GIT_COMMITTER_NAME="root" \
 	GIT_COMMITTER_EMAIL="root@localhost" \
 	GIT_COMMITTER_DATE="1356994801 -0400" \
-		git commit-tree -m "Initial commit" "$@"
+		git commit-tree "$@" <<EOF
+Initial commit
+EOF
 }
 
 # Get 'tree' from $1, change file $2 to obj id $3
@@ -128,11 +131,11 @@ GET()
 	elif isurl sftp "$1"
 	then
 		(exec 0>&-; curl -s -S -k "$1/$2")
-	elif isurl gitception "$1"
+	elif islocalrepo "$1"
 	then
-		gitception_get "${1#gitception://}" "$2"
-	else
 		cat "$1/$2"
+	else
+		gitception_get "${1#gitception://}" "$2"
 	fi
 }
 
@@ -146,22 +149,22 @@ PUT()
 	elif isurl sftp "$1"
 	then
 		curl -s -S -k --ftp-create-dirs -T - "$1/$2"
-	elif isurl gitception "$1"
+	elif islocalrepo "$1"
 	then
-		gitception_put "${1#gitception://}" "$2"
-	else
 		cat > "$1/$2"
+	else
+		gitception_put "${1#gitception://}" "$2"
 	fi
 }
 
 # Put all PUT changes for repo $1 at once
 PUT_FINAL()
 {
-	if isurl gitception "$1"
+	if isurl ssh "$1" || isurl sftp "$1" || islocalrepo "$1"
 	then
-		git push --quiet -f "${1#gitception://}" "$Gref:$Gref_rbranch"
-	else
 		:
+	else
+		git push --quiet -f "${1#gitception://}" "$Gref:$Gref_rbranch"
 	fi
 }
 
@@ -175,17 +178,22 @@ PUTREPO()
 	elif isurl sftp "$1"
 	then
 		:
-	elif isurl gitception "$1"
+	elif islocalrepo "$1"
 	then
-		gitception_new_repo "${1#gitception://}"
-	else
 		mkdir -p "$1"
+	else
+		gitception_new_repo "${1#gitception://}"
 	fi
 }
 
 CLEAN_FINAL()
 {
-	isurl gitception "$1" && git update-ref -d "$Gref" || :
+	if isurl ssh "$1" || isurl sftp "$1" || islocalrepo "$1"
+	then
+		:
+	else
+		git update-ref -d "$Gref" || :
+	fi
 }
 
 addsignkeyparam()
@@ -518,18 +526,13 @@ EOF
 	echo_git 
 }
 
-# Main program, check $URL is supported
-NAME=$1
-URL=$2
-( isurl ssh "$URL" || isurl sftp "$URL" ||
-	isurl gitception "$URL" || isnull "${URL##/*}" ) ||
-	echo_die "Supported URLs: gitception://<giturl>, Absolute path, sftp://, ssh://"
+NAME=$1  # Remote name
+URL=$2   # Remote URL
 
 mkdir -p "$Localdir"
 
 while read Input
 do
-	#echo_info "Got: $Input ($GITCEPTION)"
 	case "$Input" in
 	capabilities)
 		do_capabilities
@@ -556,7 +559,6 @@ do
 		args_="${Input##push }"
 		while read InputX
 		do
-			#echo_info "Got: (for push) $InputX"
 			case "$InputX" in
 			push\ *)
 			args_=$(append "$args_" "${InputX#push }")
@@ -572,7 +574,6 @@ do
 		echo_die "Unknown input!"
 		;;
 	*)
-		#echo_info "Blank line, we are done"
 		CLEAN_FINAL "$URL"
 		exit 0
 		;;
