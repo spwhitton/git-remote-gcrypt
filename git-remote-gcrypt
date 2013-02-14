@@ -158,8 +158,7 @@ CLEAN_FINAL()
 ENCRYPT()
 {
 	# Security protocol:
-	# Symmetric encryption using the long MASTERKEY. We use AES
-	# and OpenPGP's modification detection code (mdc).
+	# Symmetric encryption using the long MASTERKEY.
 	(printf "%s" "$MASTERKEY" | \
 		gpg --batch --force-mdc --compress-algo none \
 			--passphrase-fd 0 --output - -c /dev/fd/3) 3<&0
@@ -178,13 +177,15 @@ CLEARSIGN()
 
 CHECKSIGN()
 {
-	gpg -q --no-default-keyring --keyring "$CONF_KEYRING" -d
+	gpg -q --batch --no-default-keyring \
+		--secret-keyring /dev/null --keyring "$CONF_KEYRING" -d
 }
 
 DECRYPT()
 {
 	(printf "%s" "$MASTERKEY" | \
-		gpg -q --batch --no-default-keyring --keyring /dev/null \
+		gpg -q --batch --no-default-keyring --secret-keyring /dev/null \
+			--keyring /dev/null \
 			--passphrase-fd 0 --output - -d /dev/fd/3) 3<&0
 }
 
@@ -227,9 +228,9 @@ make_new_repo()
 	KEYSIGN=$(printf "%s\n" "$MASTERKEY" | gpg --output - --clearsign)
 	TMPMASTERKEY_ENC="$LOCALDIR/masterenc.$$"
 	trap 'rm -f "$TMPMASTERKEY_ENC"' EXIT
-	printf "%s" "$KEYSIGN" | gpg --no-default-keyring \
-		--keyring "$CONF_KEYRING" --compress-algo none -e $RECIPIENTS \
-		> "$TMPMASTERKEY_ENC"
+	printf "%s" "$KEYSIGN" | gpg --batch --no-default-keyring \
+		--secret-keyring /dev/null --keyring "$CONF_KEYRING" \
+		--compress-algo none -e $RECIPIENTS > "$TMPMASTERKEY_ENC"
 	PUT "$URL" masterkey < "$TMPMASTERKEY_ENC"
 	rm -f "$TMPMASTERKEY_ENC"
 	trap EXIT
