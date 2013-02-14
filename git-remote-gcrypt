@@ -13,7 +13,7 @@ DID_FIND_REPO=  # yes for connected, no for no repo
 LOCALDIR="${GIT_DIR:-.git}/remote-gcrypt"
 export GITCEPTION="$GITCEPTION+" # Reuse $GREF except when stacked
 GREF="refs/gcrypt/gitception$GITCEPTION"
-MANIFESTFILE=5e4a937219be20f8a9a16ae7b35a83db0c16ce501d27b231dbad6586
+REPOID=
 PACKPFX="pack :SHA224:"
 
 isurl() { test -z "${2%%$1://*}" ; }
@@ -200,6 +200,7 @@ xgrep() { command grep "$@" || : ; }
 sort_C() { LC_ALL=C command sort "$@"; }
 tac() { sed '1!G;h;$!d'; }
 echo_info() { echo "gcrypt:" "$@" >&2; }
+echo_die() { echo_info "$@" ; exit 1; }
 
 check_recipients()
 {
@@ -219,10 +220,25 @@ check_recipients()
 
 make_new_repo()
 {
+	local URLID=
+	local FIXCONFIG=
 	echo_info "Setting up new repository at $URL"
 	PUTREPO "$URL"
-	echo_info "Generating master key"
 	MASTERKEY="$(genkey)"
+
+	# We need a relatively short ID for URL+REPO
+	# The manifest will be stored at SHA224(URLID)
+	# Needed assumption: the same user should have no duplicate URLID
+	# For now, we use 20 random hex digits (80 bits), can be increased
+	URLID=$(printf "%.20s" "$(genkey | pack_hash)")
+	REPOID=$(printf "%s" "$URLID" | pack_hash)
+	echo_info "Repository ID is" "$URLID"
+	[ "${NAME#gcrypt::}" != "$URL" ] && {
+		git config "remote.$NAME.url" "gcrypt::$URL/G/$URLID"
+		FIXCONFIG=1
+	} || :
+	echo_info "Repository URL is" "gcrypt::$URL/G/$URLID"
+	[ -n "$FIXCONFIG" ] && echo_info "(configuration for $NAME updated)" ||:
 }
 
 
@@ -234,6 +250,8 @@ read_config()
 ensure_connected()
 {
 	local MANIFEST
+	local RCVREPOID
+	local URLID
 
 	if [ -n "$DID_FIND_REPO" ]
 	then
@@ -242,9 +260,17 @@ ensure_connected()
 	DID_FIND_REPO=no
 	read_config
 
+	# split out REPOID from URL
+	URLID=${URL##*/G/}
+	[ "$URLID" = "$URL" ] && URLID= && return 0 || :
+
+	URL=${URL%/G/"$URLID"}
+	REPOID=$(printf "%s" "$URLID" | pack_hash)
+
 	TMPMANIFEST_ENC="$LOCALDIR/manifest.$$"
 	trap 'rm -f "$TMPMANIFEST_ENC"' EXIT
-	GET "$URL" "$MANIFESTFILE" 2>/dev/null > "$TMPMANIFEST_ENC" || return 0
+	GET "$URL" "$REPOID" 2>/dev/null > "$TMPMANIFEST_ENC" ||
+		echo_die "Repository not found: $URLID at $URL"
 
 	DID_FIND_REPO=yes
 	echo_info "Decrypting manifest"
@@ -261,6 +287,8 @@ ensure_connected()
 	MASTERKEY=$(printf "%s\n" "$MANIFEST" | head -n 1)
 	BRANCHLIST=$(printf "%s\n" "$MANIFEST" | xgrep -E '^[0-9a-f]{40} ')
 	PACKLIST=$(printf "%s\n" "$MANIFEST" | xgrep "^$PACKPFX")
+	RCVREPOID=$(printf "%s\n" "$MANIFEST" | xgrep "^repo ")
+	[ "repo $REPOID" = "$RCVREPOID" ] || echo_die "Repository id mismatch!"
 }
 
 do_capabilities()
@@ -325,8 +353,7 @@ do_fetch()
 		RCVID="$(GET "$URL" "$PACK" | tee "$TMPPACK_ENCRYPTED" | pack_hash)"
 		if [ "$RCVID" != "$PACK" ]
 		then
-			echo_info "Packfile $PACK does not match digest!"
-			exit 1
+			echo_die "Packfile $PACK does not match digest!"
 		fi
 		DECRYPT < "$TMPPACK_ENCRYPTED" |
 			git index-pack -v --stdin >/dev/null
@@ -410,9 +437,9 @@ do_push()
 	TMPMANIFEST_ENC="$LOCALDIR/manifest.$$"
 	trap 'rm -f "$TMPMANIFEST_ENC"' EXIT
 
-	printf "%s\n%s\n%s\n" "$MASTERKEY" "$BRANCHLIST" "$PACKLIST" |
-		PRIVENCRYPT "$RECIPIENTS" > "$TMPMANIFEST_ENC"
-	PUT "$URL" "$MANIFESTFILE" < "$TMPMANIFEST_ENC"
+	printf "%s\n%s\n%s\n%s\n" "$MASTERKEY" "$BRANCHLIST" "$PACKLIST" \
+		"repo $REPOID" | PRIVENCRYPT "$RECIPIENTS" > "$TMPMANIFEST_ENC"
+	PUT "$URL" "$REPOID" < "$TMPMANIFEST_ENC"
 
 	PUT_FINAL "$URL"
 
@@ -439,8 +466,8 @@ do_push()
 NAME=$1
 URL=$2
 ( isurl ssh "$URL" || isurl sftp "$URL" ||
-	isurl gitception "$URL" || test -z ${URL##/*} ) || {
-	echo_info "Supported URLs: gitception://<giturl>, Absolute path, sftp://, ssh://" && exit 1 ; }
+	isurl gitception "$URL" || test -z ${URL##/*} ) ||
+	echo_die "Supported URLs: gitception://<giturl>, Absolute path, sftp://, ssh://"
 
 mkdir -p "$LOCALDIR"
 
@@ -486,8 +513,7 @@ do
 		do_push "$PUSH_ARGS"
 		;;
 	?*)
-		echo_info "Unknown input!"
-		exit 1
+		echo_die "Unknown input!"
 		;;
 	*)
 		#echo_info "Blank line, we are done"
