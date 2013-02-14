@@ -168,7 +168,7 @@ CLEARSIGN()
 {
 	if [ "$CONF_SIGN_MANIFEST" = "true" ]
 	then
-		echo_info "Signing new manifest"
+		echo_info "Requesting manifest signature for push"
 		gpg --output - --clearsign
 	else
 		cat
@@ -222,12 +222,13 @@ make_new_repo()
 		exit 1
 	fi
 	PUTREPO "$URL"
-	echo_info "Encrypting to \"$RECIPIENTS\""
-	echo_info "Generating new master key"
+	echo_info "Generating master key"
+	echo_info "Requesting master key signature"
 	MASTERKEY="$(genkey)"
 	KEYSIGN=$(printf "%s\n" "$MASTERKEY" | gpg --output - --clearsign)
 	TMPMASTERKEY_ENC="$LOCALDIR/masterenc.$$"
 	trap 'rm -f "$TMPMASTERKEY_ENC"' EXIT
+	echo_info "Encrypting masterkey to \"$RECIPIENTS\""
 	printf "%s" "$KEYSIGN" | gpg --batch --no-default-keyring \
 		--secret-keyring /dev/null --keyring "$CONF_KEYRING" \
 		--compress-algo none -e $RECIPIENTS > "$TMPMASTERKEY_ENC"
@@ -240,9 +241,8 @@ get_masterkey()
 {
 	TMPMASTERKEY_ENC="$LOCALDIR/masterenc.$$"
 	trap 'rm -f "$TMPMASTERKEY_ENC"' EXIT
-	echo_info "Verifying masterkey signature"
 	GET "$URL" masterkey 2>/dev/null > "$TMPMASTERKEY_ENC" || return 0
-	#echo_info "Opening Master Key"
+	echo_info "Verifying master key signature"
 	gpg -q -d < "$TMPMASTERKEY_ENC" | CHECKSIGN || {
 		echo_info "Opening of master key failed!"
 		echo_info "Using keyring $CONF_KEYRING"
