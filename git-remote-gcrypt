@@ -410,11 +410,22 @@ ensure_connected()
 	iseq "$(repoidstr)" "$rcv_repoid" || echo_die "Repository id mismatch!"
 }
 
+fetch_decrypt_pack()
+{
+	local key_= rcv_id=
+	GET "$URL" "$1" "$TmpPack_Encrypted" &&
+	rcv_id=$(pack_hash < "$TmpPack_Encrypted") &&
+	iseq "$rcv_id" "$1" ||
+		echo_die "Packfile $1 does not match digest!"
+	key_=$(xecho "$Packlist" | grep "$1" | cut -f 3 -d ' ')
+	DECRYPT "$key_" < "$TmpPack_Encrypted"
+}
+
 # $1 is new pack id $2 key
 # set did_repack=yes if repacked
 repack_if_needed()
 {
-	local pack_= rcv_id= packline_= premote_= key_= pkeep_= n_=
+	local pack_= packline_= premote_= key_= pkeep_= n_=
 
 	# $TmpPack_Encrypted set in caller
 
@@ -448,14 +459,7 @@ repack_if_needed()
 			continue
 		fi
 		pack_=${packline_#"$Packpfx"}
-		GET "$URL" "$pack_" "$TmpPack_Encrypted"
-		rcv_id=$(pack_hash < "$TmpPack_Encrypted")
-		if isnoteq "$rcv_id" "$pack_"
-		then
-			echo_die "Packfile $pack_ does not match digest!"
-		fi
-		key_=$(xecho "$Packlist" | grep "$pack_" | cut -f 3 -d ' ')
-		DECRYPT "$key_" < "$TmpPack_Encrypted" |
+		fetch_decrypt_pack "$pack_" |
 		git index-pack -v --stdin "$Localdir/pack/${pack_}.pack" >/dev/null
 	done
 	key_=$(genkey "$Packkey_bytes")
@@ -511,11 +515,10 @@ do_list()
 
 do_fetch()
 {
-	# Security protocol:
 	# The PACK id is the hash of the encrypted git packfile.
 	# We only download packs mentioned in the encrypted manifest,
 	# and check their digest when received.
-	local pack_= rcv_id= packline_= pneed_= pboth_= phave_= premote_= key_=
+	local pack_= packline_= pneed_= phave_= premote_=
 
 	ensure_connected
 
@@ -529,24 +532,15 @@ do_fetch()
 	trap 'rm -f "$TmpPack_Encrypted"' EXIT
 
 	premote_=$(xecho "$Packlist" | cut -f 1-2 -d ' ')
-	# Needed packs is  Packlist - (phave & Packlist)
 	# The `+` for $GITCEPTION is pointless but we will be safe for stacking
 	phave_="$(cat "$Localdir/have_packs+" 2>/dev/null || :)"
-	pboth_="$(xecho "$premote_" | xgrep -F  -x -e "$phave_")"
 	pneed_="$(xecho "$premote_" | xgrep -F -vx -e "$phave_")"
 
 	xecho "$pneed_" | while read packline_
 	do
 		isnonnull "$packline_" || continue
 		pack_=${packline_#"$Packpfx"}
-		GET "$URL" "$pack_" "$TmpPack_Encrypted"
-		rcv_id=$(pack_hash < "$TmpPack_Encrypted")
-		if isnoteq "$rcv_id" "$pack_"
-		then
-			echo_die "Packfile $pack_ does not match digest!"
-		fi
-		key_=$(xecho "$Packlist" | grep "$pack_" | cut -f 3 -d ' ')
-		DECRYPT "$key_" < "$TmpPack_Encrypted" |
+		fetch_decrypt_pack "$pack_" |
 			git index-pack -v --stdin >/dev/null
 		# add to local pack list
 		xecho "$Packpfx$pack_" >> "$Localdir/have_packs$GITCEPTION"
