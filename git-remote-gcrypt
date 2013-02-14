@@ -301,8 +301,8 @@ do_fetch()
 			echo_info "Packfile $PACK does not match digest!"
 			exit 1
 		fi
-		DECRYPT < "$TMPPACK_ENCRYPTED" | git unpack-objects
-
+		DECRYPT < "$TMPPACK_ENCRYPTED" | \
+			git index-pack -v --stdin >/dev/null
 		# add to local pack list
 		printf "$PACKPFX%s\n" "$PACK" >> "$LOCALDIR/have_packs"
 	done
