@@ -3,8 +3,7 @@
 # License: GPLv2 or any later version, see http://www.gnu.org/licenses/
 # Use GnuPG to use encrypted git remotes
 
-WARNING: This is a proof of concept
-WARNING: Repository format WILL change, incompatibly
+WARNING: Repository format MAY STILL change, incompatibly
 
 INTRODUCTION
 
@@ -13,59 +12,78 @@ Install as `git-remote-gcrypt` in $PATH
 Supports local, ssh:// and sftp:// remotes at the moment,
 as well as the special gitception://<giturl> remote type::
 
-    git config --global gcrypt.recipients KEYID1
     git remote add gcryptrepo gcrypt::ssh://hostname.com:MyNewRepo
      ( or maybe:
        git remote add gcryptrepo gcrypt::gitception://git://host.com/repo.git
      )
     git push --all gcryptrepo
 
+DESIGN GOALS
+
+ + Confidential, authenticated git storage and collaboration on any
+   untrusted file host or service. The only information we (by necessity)
+   leak is the approximate size and timing of updates.
+   PLEASE help me evaluate how well we meet this design goal!
+
 CONFIGURATION
 
- * You must set up a small gpg keyring for the repository::
+ + You must set up a small gpg keyring for the repository::
 
      gpg --export KEYID1 > <path-to-keyring>
      git config gcrypt.keyring <path-to-keyring>
 
-   New repositories will be created to allow access for the keys in
+   New repositories will be set up to allow access for the keys in
    `gcrypt.keyring`. The keyring is used to verify the authenticity of the
    repository when it is read or written to.
 
- * Set `git config gcrypt.signmanifest 1` to also sign the manifest (the
-   list of branches and packfiles) when pushing.
- * Set `git config gcrypt.requiresign 1` to fail and stop if no valid
+ + NOTE: We use the user's gnupg configuration for `cipher-algo` and so on!
+         Configure your gnupg to use strong crypto -- see `man gpg`.
+
+ + Set `git config gcrypt.signmanifest 1` to also sign the manifest (the
+   list of branches and packfiles) when pushing. This is optional and
+   using signed git tags might be an alternative.
+ + Set `git config gcrypt.requiresign 1` to fail and stop if no valid
    signature is found on the manifest.
  
- * NOTE: We use the users gnupg configuration for cipher-algo and so on!
-         Configure your gnupg to use a strong crypto -- see `man gpg`.
-
 
 REPOSITORY FORMAT
 
- * masterkey is first signed, then encrypted using `gpg -e` with hidden
-   recipients
- * manifest contains the branches and the list of packfiles
+ + The masterkey is first signed, then encrypted using `gpg -e` with
+   hidden recipients and stored on the remote.
+ + The manifest contains the list of branches and packfiles, and an
+   optional signature
 
     $ cd MyCryptedRemote
     $ ls 
-    -rw-- 11K 00ef27cc2c5b76365e1a46479ed7429e16572c543cdff0a8bf745c7c
-    -rw-- 41K b934d8d6c0f48e71b9d7a4d5ea56f024a9bed4f6f2c6f8e688695bee
-    -rw-- 577 manifest
-    -rw-- 495 masterkey
+    -rw--  11K 00ef27cc2c5b76365e1a46479ed7429e16572c543cdff0a8bf745c7c
+    -rw--  41K b934d8d6c0f48e71b9d7a4d5ea56f024a9bed4f6f2c6f8e688695bee
+    -rw--  577 manifest
+    -rw-- 1.3K masterkey
     
-    $ gpg -d masterkey | gpg --passphrase-fd 0 -d manifest 
-    -----BEGIN PGP SIGNED MESSAGE-----
-    Hash: SHA512
-    
+    $ gpg -d masterkey | gpg -d | gpg --passphrase-fd 0 -d manifest
     b4a4a39365d19282810c19d0f3f24d04dd2d179f refs/tags/something
     1d323ddadf4cf1d80fced447e637ab3766b168b7 refs/heads/master
     pack :SHA224:00ef27cc2c5b76365e1a46479ed7429e16572c543cdff0a8bf745c7c
     pack :SHA224:b934d8d6c0f48e71b9d7a4d5ea56f024a9bed4f6f2c6f8e688695bee
-    -----BEGIN PGP SIGNATURE-----
-    Version: GnuPG v1.4.12 (GNU/Linux)
-    
-    XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-    XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-    XXXXX
-    -----END PGP SIGNATURE-----
+
+
+ + Protocol sketch
+
+   gpg -c is symmetric encryption, for example AES
+   gpg -e is encrypting to a PGP key holder
+   gpg -s adds a signature
+
+   master key M, generated once, 128 bytes
+   file `masterkey' contains   cat M | gpg -s | gpg -e > `masterkey'
+   manifest and packfiles are encrypted    cat FILE | gpg -c --passphrase M
+
+   To read repository
+   decrypt  cat `masterkey' | gpg -d | gpg --verify > M
+   decrypt  cat FILE.crypt  | gpg -d --passphrase M
+
+   The masterkey is decrypted and its signature is verified before
+   reading or writing of any other file. Only packs mentioned in `manifest`
+   are downloaded.
+   Pack hashes are verified when fetched. The filename is simply the hash
+   of the packfile.
 
