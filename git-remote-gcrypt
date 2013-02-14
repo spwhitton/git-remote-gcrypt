@@ -25,7 +25,7 @@ sha1()
 LOCALDIR="${GIT_DIR:-.git}/remote-gcrypt"
 DUMMYKEY="00000000000000000000"
 
-isurl() { test -z ${2%%$1://*} ; }
+isurl() { test -z "${2%%$1://*}" ; }
 
 # Split $1 into $prefix_:$suffix_
 splitcolon()
@@ -39,7 +39,7 @@ GET()
 {
 	if isurl ssh "$1"
 	then
-		splitcolon ${1#ssh://}
+		splitcolon "${1#ssh://}"
 		(exec 0>&-; ssh "$prefix_" "cat $suffix_/$2")
 	elif isurl sftp "$1"
 	then
@@ -57,7 +57,7 @@ PUT()
 {
 	if isurl ssh "$1"
 	then
-		splitcolon ${1#ssh://}
+		splitcolon "${1#ssh://}"
 		ssh "$prefix_" "cat > $suffix_/$2"
 	elif isurl sftp "$1"
 	then
@@ -72,7 +72,7 @@ PUTREPO()
 {
 	if isurl ssh "$1"
 	then
-		splitcolon ${1#ssh://}
+		splitcolon "${1#ssh://}"
 		(exec 0>&- ; ssh "$prefix_" "mkdir -p $suffix_")
 	elif isurl sftp "$1"
 	then
@@ -188,7 +188,7 @@ do_fetch()
 			echo_info "Packfile $PACK does not match digest!"
 			exit 1
 		fi
-		cat "$TMPPACK_ENCRYPTED" | DECRYPT | git unpack-objects
+		DECRYPT < "$TMPPACK_ENCRYPTED" | git unpack-objects
 
 		# add to local pack list
 		printf "%s\n" "$PACK" >> "$LOCALDIR/packfest"
@@ -230,17 +230,17 @@ do_push()
 	REMOTEWANT="$(printf "%s\n" "$1" | while read LINE
 	do
 		# +src:dst -- remove leading + then split at :
-		splitcolon ${LINE#+}
+		splitcolon "${LINE#+}"
 		if [ ! -z "$prefix_" ]
 		then
 			printf "%s " "$prefix_"
-			printf "%s %s\n" $(git rev-parse "$prefix_") "$suffix_" >> "$TMPMANIFEST"
+			printf "%s %s\n" "$(git rev-parse "$prefix_")" "$suffix_" >> "$TMPMANIFEST"
 		# else delete
 		fi
 	done)"
 
 	# POSIX compat issue: sort -s (stable), but supported in bsd and gnu
-	MANIFESTDATA="$(cat "$TMPMANIFEST" | sort -k2 -s | tac | uniq -s40)"
+	MANIFESTDATA="$(sort -k2 -s "$TMPMANIFEST" | tac | uniq -s40)"
 
 	TMPPACK_ENCRYPTED="$LOCALDIR/tmp_pack_ENCRYPTED_.$$"
 	TMPOBJLIST="$LOCALDIR/tmp_packrevlist.$$"
@@ -250,7 +250,7 @@ do_push()
 	# Only send pack if we have any objects to send
 	if [ -s "$TMPOBJLIST" ]
 	then
-		PACKID=$(cat "$TMPPACK_ENCRYPTED" | sha1)
+		PACKID=$(sha1 < "$TMPPACK_ENCRYPTED")
 		PACKFEST="$(GET_OR_EMPTY "$URL" packfest | DECRYPT)"
 		if [ -z "$PACKFEST" ]
 		then
@@ -259,7 +259,7 @@ do_push()
 			PACKFEST="$(printf "%s\n%s\n" "$PACKFEST" "$PACKID")"
 		fi
 
-		cat "$TMPPACK_ENCRYPTED" | PUT "$URL" "$PACKID"
+		PUT "$URL" "$PACKID" < "$TMPPACK_ENCRYPTED"
 		printf "%s\n" "$PACKFEST" | ENCRYPT | PUT "$URL" "packfest"
 	fi
 
@@ -269,7 +269,7 @@ do_push()
 	printf "%s\n" "$1" | while read LINE
 	do
 		# +src:dst -- remove leading + then split at :
-		splitcolon ${LINE#+}
+		splitcolon "${LINE#+}"
 		if [ -z "$prefix_" ]
 		then
 			echo "error $suffix_ delete not supported yet"
