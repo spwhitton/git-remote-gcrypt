@@ -16,7 +16,7 @@ Remote helper programs are invoked by git to handle network transport.
 This helper handles gcrypt:: URLs that will access a remote repository
 encrypted with GPG, using our custom format.
 
-Supported locations are `local`, `ssh://`, `rsync://` and `sftp`, where
+Supported locations are `local`, `rsync://` and `sftp://`, where
 the repository is stored as a set of files, or instead any `<giturl>`
 where gcrypt will store the same representation in a git repository,
 bridged over arbitrary git transport.
@@ -39,10 +39,10 @@ Quickstart
 
     ::
 
-        git remote add cryptremote gcrypt::ssh://example.com:repo
+        git remote add cryptremote gcrypt::rsync://example.com:repo
         git push cryptremote master
         > gcrypt: Setting up new repository
-        > gcrypt: Repository URL is gcrypt::ssh://example.com:repo#KNBr0wKzct52
+        > gcrypt: Repository URL is gcrypt::rsync://example.com:repo#KNBr0wKzct52
         > gcrypt: (configuration for cryptremote updated)
         > [ more lines .. ]
         > To gcrypt::[...]
@@ -88,7 +88,7 @@ Examples
 ::
 
     git config gcrypt.participants YOURKEYID
-    git remote add cryptremote  gcrypt::ssh://example.com:repo
+    git remote add cryptremote  gcrypt::rsync://example.com:repo
     git push cryptremote HEAD
 
 How to use a git backend::

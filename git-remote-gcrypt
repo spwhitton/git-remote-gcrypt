@@ -142,11 +142,7 @@ gitception_new_repo()
 # Fetch repo $1, file $2, tmpfile in $3
 GET()
 {
-	if isurl ssh "$1"
-	then
-		splitcolon "${1#ssh://}"
-		(exec 0>&-; ssh "$prefix_" "cat $suffix_/$2") > "$3"
-	elif isurl sftp "$1"
+	if isurl sftp "$1"
 	then
 		(exec 0>&-; curl -s -S -k "$1/$2") > "$3"
 	elif isurl rsync "$1"
@@ -163,11 +159,7 @@ GET()
 # Put repo $1, file $2 or fail, tmpfile in $3
 PUT()
 {
-	if isurl ssh "$1"
-	then
-		splitcolon "${1#ssh://}"
-		ssh "$prefix_" "cat > $suffix_/$2" < "$3"
-	elif isurl sftp "$1"
+	if isurl sftp "$1"
 	then
 		curl -s -S -k --ftp-create-dirs -T "$3" "$1/$2"
 	elif isurl rsync "$1"
@@ -184,7 +176,7 @@ PUT()
 # Put all PUT changes for repo $1 at once
 PUT_FINAL()
 {
-	if isurl ssh "$1" || isurl sftp "$1" || islocalrepo "$1" || isurl rsync "$1"
+	if isurl sftp "$1" || islocalrepo "$1" || isurl rsync "$1"
 	then
 		:
 	else
@@ -195,11 +187,7 @@ PUT_FINAL()
 # Put directory for repo $1
 PUTREPO()
 {
-	if isurl ssh "$1"
-	then
-		splitcolon "${1#ssh://}"
-		(exec 0>&- ; ssh "$prefix_" "mkdir -p $suffix_")
-	elif isurl sftp "$1"
+	if isurl sftp "$1"
 	then
 		:
 	elif isurl rsync "$1"
@@ -217,11 +205,7 @@ PUTREPO()
 REMOVE()
 {
 	local fn_=
-	if isurl ssh "$1"
-	then
-		splitcolon "${1#ssh://}"
-		(exec 0>&- ; ssh "$prefix_" "cd $suffix_; rm $2")
-	elif isurl sftp "$1"
+	if isurl sftp "$1"
 	then
 		# FIXME
 		echo_info "sftp: Ignore remove request $1/$2"
@@ -231,7 +215,9 @@ REMOVE()
 			--exclude='*' "$Localdir"/ "${1#rsync://}/" >&2
 	elif islocalrepo "$1"
 	then
-		(cd "$1"; rm $2)
+		for fn_ in $2; do
+			rm -f "$1"/"$fn_"
+		done
 	else
 		for fn_ in $2; do
 			gitception_remove "${1#gitception://}" "$fn_"
@@ -241,7 +227,7 @@ REMOVE()
 
 CLEAN_FINAL()
 {
-	if isurl ssh "$1" || isurl sftp "$1" || islocalrepo "$1" || isurl rsync "$1"
+	if isurl sftp "$1" || islocalrepo "$1" || isurl rsync "$1"
 	then
 		:
 	else
@@ -387,6 +373,11 @@ ensure_connected()
 	fi
 	Did_find_repo=no
 	read_config
+
+	# Fixup ssh:// -> rsync://
+	if isurl ssh "$URL"; then
+		URL="rsync://${URL#ssh://}"
+	fi
 
 	# split out Repo ID from URL
 	url_id=${URL##*"#"}
