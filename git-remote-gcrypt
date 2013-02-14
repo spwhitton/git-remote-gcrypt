@@ -10,8 +10,8 @@
 set -e
 
 Did_find_repo=  # yes for connected, no for no repo
-Localdir="${GIT_DIR:-.git}/remote-gcrypt"
-export GITCEPTION="$GITCEPTION+" # Reuse $Gref except when stacked
+Localdir="${GIT_DIR:=.git}/remote-gcrypt"
+export GITCEPTION="${GITCEPTION:-}+" # Reuse $Gref except when stacked
 Gref="refs/gcrypt/gitception$GITCEPTION"
 Gref_rbranch="refs/heads/master"
 Repoid=
@@ -19,6 +19,9 @@ Hashpfx=":SHA224:"
 UrlTag="G."
 Packpfx="pack $Hashpfx"
 Packkey_bytes=33
+
+Branchlist=
+Packlist=
 Extension_list=
 
 # compat/utility functions
@@ -518,7 +521,7 @@ EOF
 NAME=$1
 URL=$2
 ( isurl ssh "$URL" || isurl sftp "$URL" ||
-	isurl gitception "$URL" || isnull ${URL##/*} ) ||
+	isurl gitception "$URL" || isnull "${URL##/*}" ) ||
 	echo_die "Supported URLs: gitception://<giturl>, Absolute path, sftp://, ssh://"
 
 mkdir -p "$Localdir"
