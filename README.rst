@@ -13,7 +13,7 @@ Description
 ===========
 
 Remote helper programs are invoked by git to handle network transport.
-This helper handles gcrypt:: URLs that will access a remote repository
+This helper handles `gcrypt::` URLs that will access a remote repository
 encrypted with GPG, using our custom format.
 
 Supported locations are `local`, `rsync://` and `sftp://`, where
@@ -29,13 +29,7 @@ bridged over arbitrary git transport.
 Quickstart
 ..........
 
-* Install `git-remote-gcrypt` by running the supplied `install.sh` script.
-
-* Configure the list of participant gpg keys:
-
-    ::
-
-        git config --global gcrypt.participants YOURKEYID
+* Install ``git-remote-gcrypt`` by running the supplied ``install.sh`` script.
 
 * Create an encrypted remote by pushing to it:
 
@@ -49,9 +43,9 @@ Quickstart
         > To gcrypt::[...]
         > * [new branch]      master -> master
 
-(The generated Repository id is not secret, it only exists to ensure
+(The generated Repository ID is not secret, it only exists to ensure
 that two repositories signed by the same user can be distinguished.
-You will see a warning if the remote repository ID changes, which will
+You will see a warning if the remote Repository ID changes, which will
 only happen if the remote was re-created or switched out.)
 
 Design Goals
@@ -65,13 +59,26 @@ evaluate how well we meet this design goal!
 Configuration
 =============
 
-*gcrypt.participants*
+The following ``git-config(1)`` variables are supported:
+
+``remote.<name>.gcrypt-participants``
+        ..
+``gcrypt.participants``
         Space-separated list of GPG key identifiers. The remote is
         encrypted to these participants and only signatures from these
         are accepted. ``gpg -k`` lists all public keys you know.
 
-You should set *user.signingkey* if your default signing key is not part
-of the participant list.
+        When not set we encrypt to your default key and accept any valid
+        signature. This behavior can also be requested explicitly by
+        setting participants to ``simple``.
+
+        The ``gcrypt-participants`` setting on the remote takes precedence
+        over the repository variable ``gcrypt.participants``.
+
+``user.signingkey``
+        (From regular git configuration) The key to use for signing.
+        You should set ``user.signingkey`` if your default signing key is
+        not part of the participant list.
 
 The encryption of the manifest is updated for each push. The pusher must
 have the public keys of all collaborators.  You can commit a keyring to
@@ -79,6 +86,9 @@ the repo, further key management features do not yet exist.
 
 GPG configuration applies to public-key encryption, symmetric
 encryption, and signing. See `man gpg` for more information.
+
+Environment Variables
+=====================
 
 *GCRYPT_FULL_REPACK*
         This environment variable forces full repack when pushing.
@@ -115,7 +125,7 @@ Repository Format
 
     B: branch list
     L: list of the hash (Hi) and key (Ki) for each packfile
-    R: repository id
+    R: Repository ID
     
     Store Manifest as EncSign(B || L || R)
     Store each packfile P as P' = Encrypt(Ki, P) in filename Hi
@@ -124,7 +134,7 @@ Repository Format
     To read the repository
 
     decrypt+verify Manifest using private key -> (B, L, R)
-    warn if R does not match saved repository id for this remote
+    warn if R does not match saved Repository ID for this remote
     for Hi, Ki in L:
         download file Hi from the server -> P'
         verify Hash(P') matches Hi
@@ -147,26 +157,20 @@ Manifest file
 
 Each item extends until newline, and matches one of the following forms:
 
-  `[0-9a-f]{40} <gitref>`
-      SHA-1 and its git ref
+``[0-9a-f]{40} <gitref>``
+    SHA-1 and its git ref
 
-  `pack :<hashtype>:<hash> <key>`
-      Packfile hash (`Hi`) and corresponding symmetric key (`Ki`).
+``pack :<hashtype>:<hash> <key>``
+    Packfile hash (`Hi`) and corresponding symmetric key (`Ki`).
 
-  `keep :<hashtype>:<hash> <generation>`
-      Packfile hash and its repack generation
+``keep :<hashtype>:<hash> <generation>``
+    Packfile hash and its repack generation
 
-  `repo :<hashtype>:<hash>`
-      The repository id
+``repo :<hashtype>:<hash>``
+    The repository id
 
-  `extn <name> ...`
-      Extension field, preserved but unused.
-
-
-Yet to be Implemented
-.....................
-
-+ Some kind of simple keyring management
+``extn <name> ...``
+    Extension field, preserved but unused.
 
 See Also
 ========
