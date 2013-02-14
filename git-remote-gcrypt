@@ -164,6 +164,14 @@ ENCRYPT()
 			--passphrase-fd 0 --output - -c /dev/fd/3) 3<&0
 }
 
+DECRYPT()
+{
+	(printf "%s" "$MASTERKEY" | \
+		gpg -q --batch --no-default-keyring --secret-keyring /dev/null \
+			--keyring /dev/null \
+			--passphrase-fd 0 --output - -d /dev/fd/3) 3<&0
+}
+
 CLEARSIGN()
 {
 	if [ "$CONF_SIGN_MANIFEST" = "true" ]
@@ -175,19 +183,27 @@ CLEARSIGN()
 	fi
 }
 
-CHECKSIGN()
+# Require both gpg success and status word $1
+gpg_check_status()
 {
-	gpg -q --batch --no-default-keyring \
+	local STATUS
+	local ARG
+	ARG=$1 ; shift;
+	STATUS=$(gpg --status-fd 3 "$@" 3>&1 1>&4) 4>&1 &&
+		printf "%s" "$STATUS" | grep "^\[GNUPG:\] $ARG " >/dev/null
+}
+
+VERIFYSIGN()
+{
+	gpg_check_status "GOODSIG" -q --batch --no-default-keyring \
 		--secret-keyring /dev/null --keyring "$CONF_KEYRING" -d
 }
 
-DECRYPT()
+PRIVDECRYPT()
 {
-	(printf "%s" "$MASTERKEY" | \
-		gpg -q --batch --no-default-keyring --secret-keyring /dev/null \
-			--keyring /dev/null \
-			--passphrase-fd 0 --output - -d /dev/fd/3) 3<&0
+	gpg_check_status "ENC_TO" -q -d
 }
+
 
 # Append $2 to $1 with a newline separator
 append()
@@ -239,12 +255,19 @@ make_new_repo()
 
 get_masterkey()
 {
+	# The master key and its clearsigned versions are safe to keep
+	# as text in variables
+	local MASTERKEYDEC
 	TMPMASTERKEY_ENC="$LOCALDIR/masterenc.$$"
 	trap 'rm -f "$TMPMASTERKEY_ENC"' EXIT
 	GET "$URL" masterkey 2>/dev/null > "$TMPMASTERKEY_ENC" || return 0
+	MASTERKEYDEC=$(PRIVDECRYPT < "$TMPMASTERKEY_ENC") || {
+		echo_info "Decryption of master key failed!"
+		exit 1
+	}
 	echo_info "Verifying master key signature"
-	gpg -q -d < "$TMPMASTERKEY_ENC" | CHECKSIGN || {
-		echo_info "Opening of master key failed!"
+	printf "%s" "$MASTERKEYDEC" | VERIFYSIGN || {
+		echo_info "Failed to verify master key signature!"
 		echo_info "Using keyring $CONF_KEYRING"
 		if [ "$CONF_KEYRING" = "/dev/null" ] ; then
 		echo_info "Please configure gcrypt.keyring"
@@ -286,8 +309,8 @@ ensure_connected()
 	then
 		# Use gpg to verify and strip the signature
 		echo_info "Verifying manifest signature"
-		STRIPDATA="$(printf "%s" "$MANIFESTDATA" | CHECKSIGN || {
-			echo_info "WARNING: Failed to verify signature from $URL"
+		STRIPDATA="$(printf "%s" "$MANIFESTDATA" | VERIFYSIGN || {
+			echo_info "WARNING: Failed to verify manifest signature"
 			echo_info "WARNING: Using keyring $CONF_KEYRING"
 			if [ "$CONF_KEYRING" = "/dev/null" ] ; then
 			echo_info "WARNING: Please configure gcrypt.keyring"
