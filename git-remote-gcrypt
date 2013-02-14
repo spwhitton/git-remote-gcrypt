@@ -22,7 +22,8 @@ pack_hash()
 LOCALDIR="${GIT_DIR:-.git}/remote-gcrypt"
 DID_FIND_REPO=  # yes for connected, no for no repo
 PACKPFX="pack :SHA224:"
-GREF="refs/gcrypt/togit"
+export GITCEPTION="$GITCEPTION+" # Reuse $GREF except when stacked
+GREF="refs/gcrypt/gitception.$GITCEPTION"
 
 isurl() { test -z "${2%%$1://*}" ; }
 
@@ -33,32 +34,22 @@ splitcolon()
 	suffix_=${1#*:}
 }
 
-# Fetch repo $1, file $2
-GET()
+## gitception part
+# Fetch giturl $1, file $2
+gitception_get()
 {
-	local REPO
-	if isurl ssh "$1"
-	then
-		splitcolon "${1#ssh://}"
-		(exec 0>&-; ssh "$prefix_" "cat $suffix_/$2")
-	elif isurl sftp "$1"
-	then
-		(exec 0>&-; curl -s -S -k "$1/$2")
-	elif isurl gitception "$1"
-	then
-		REPO=${1#gitception://}
-		git fetch "$REPO" 2>/dev/null >&2 && \
-			OBJID=$(git ls-tree FETCH_HEAD | xgrep -E "\b$2$" | \
-				awk '{print $3}') && [ -n "$OBJID" ] && \
-			git cat-file blob "$OBJID"
-		git update-ref "$GREF" FETCH_HEAD
-	else
-		cat "$1/$2"
-	fi
+	# Take care to preserve FETCH_HEAD
+	local FHEAD
+	local RETVAL
+	FHEAD="$GIT_DIR/FETCH_HEAD"
+	[ -e "$FHEAD" ] && command mv -f "$FHEAD" "$FHEAD.$$~" || :
+	git fetch -q -f "$1" HEAD:"$GREF" 2>/dev/tty >/dev/null && \
+		OBJID=$(git ls-tree "$GREF" | xgrep -E "\b$2$" |
+			awk '{print $3}') && [ -n "$OBJID" ] && \
+		git cat-file blob "$OBJID" && RETVAL=: || \
+		{ RETVAL=false && : ; }
+	[ -e "$FHEAD.$$~" ] && command mv -f "$FHEAD.$$~" "$FHEAD" && $RETVAL
 }
-
-# Fetch repo $1, file $2 or return encrypted empty message
-GET_OR_EMPTY() { GET "$@" 2>/dev/null || (printf "" | ENCRYPT) ; }
 
 anon_commit()
 {
@@ -77,6 +68,38 @@ update_tree()
 		printf "100644 blob %s\t%s" "$3" "$2") | git mktree
 }
 
+# Put giturl $1, file $2
+# depends on previous GET to set $GREF and depends on PUT_FINAL later
+gitception_put()
+{
+	OBJID=$(git hash-object -w --stdin) && \
+		TREEID=$(update_tree "$GREF" "$2" "$OBJID") &&
+		COMMITID=$(anon_commit "$TREEID" -m "x") && \
+		git update-ref "$GREF" "$COMMITID"
+}
+## end gitception
+
+# Fetch repo $1, file $2
+GET()
+{
+	if isurl ssh "$1"
+	then
+		splitcolon "${1#ssh://}"
+		(exec 0>&-; ssh "$prefix_" "cat $suffix_/$2")
+	elif isurl sftp "$1"
+	then
+		(exec 0>&-; curl -s -S -k "$1/$2")
+	elif isurl gitception "$1"
+	then
+		gitception_get "${1#gitception://}" "$2"
+	else
+		cat "$1/$2"
+	fi
+}
+
+# Fetch repo $1, file $2 or return encrypted empty message
+GET_OR_EMPTY() { GET "$@" 2>/dev/null || (printf "" | ENCRYPT) ; }
+
 # Put repo $1, file $2 or fail
 PUT()
 {
@@ -89,10 +112,7 @@ PUT()
 		curl -s -S -k --ftp-create-dirs -T - "$1/$2"
 	elif isurl gitception "$1"
 	then
-		OBJID=$(git hash-object -w --stdin) && \
-			TREEID=$(update_tree "$GREF" "$2" "$OBJID") &&
-			COMMITID=$(anon_commit "$TREEID" -m "x") && \
-			git update-ref "$GREF" "$COMMITID"
+		gitception_put "${1#gitception://}" "$2"
 	else
 		cat > "$1/$2"
 	fi
@@ -101,11 +121,9 @@ PUT()
 # Put all PUT changes for repo $1 at once
 PUT_FINAL()
 {
-	local REPO
 	if isurl gitception "$1"
 	then
-		REPO=${1#gitception://}
-		git push --quiet -f "$REPO" "$GREF":master
+		git push --quiet -f "${1#gitception://}" "$GREF":master
 	else
 		:
 	fi
@@ -128,6 +146,11 @@ PUTREPO()
 	else
 		mkdir -p "$1"
 	fi
+}
+
+CLEAN_FINAL()
+{
+	isurl gitception "$1" && git update-ref -d "$GREF" || :
 }
 
 ENCRYPT()
@@ -289,7 +312,8 @@ do_fetch()
 	trap 'rm -f "$TMPPACK_ENCRYPTED"' EXIT
 
 	# Needed packs is  REMOTE - (HAVE & REMOTE)
-	PHAVE="$(cat "$LOCALDIR/have_packs" 2>/dev/null || :)"
+	# The `+` for $GITCEPTION is pointless but we will be safe for stacking
+	PHAVE="$(cat "$LOCALDIR/have_packs+" 2>/dev/null || :)"
 	PBOTH="$(printf "%s\n%s" "$PACKLIST" "$PHAVE" | sort_C | uniq -d)"
 	PNEED="$(printf "%s\n%s" "$PACKLIST" "$PBOTH" | sort_C | uniq -u)"
 
@@ -306,7 +330,7 @@ do_fetch()
 		DECRYPT < "$TMPPACK_ENCRYPTED" | \
 			git index-pack -v --stdin >/dev/null
 		# add to local pack list
-		printf "$PACKPFX%s\n" "$PACK" >> "$LOCALDIR/have_packs"
+		printf "$PACKPFX%s\n" "$PACK">>"$LOCALDIR/have_packs$GITCEPTION"
 	done
 
 	rm -f "$TMPPACK_ENCRYPTED"
@@ -407,7 +431,7 @@ mkdir -p "$LOCALDIR"
 
 while read INPUT
 do
-	#echo_info "Got: $INPUT"
+	#echo_info "Got: $INPUT ($GITCEPTION)"
 	case "$INPUT" in
 	capabilities)
 		do_capabilities
@@ -452,6 +476,7 @@ do
 		;;
 	*)
 		#echo_info "Blank line, we are done"
+		CLEAN_FINAL "$URL"
 		exit 0
 		;;
 	esac
