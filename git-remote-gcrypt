@@ -169,6 +169,7 @@ do_list()
 
 	printf "%s\n" "$BRANCHLIST" | while read LINE
 	do
+		[ -z "$LINE" ] && break
 		OBJID=${LINE%% *}
 		REFNAME=${LINE##* }
 		echo "$OBJID" "$REFNAME"
