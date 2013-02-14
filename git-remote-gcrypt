@@ -48,7 +48,8 @@ gitception_get()
 			awk '{print $3}') && [ -n "$OBJID" ] && \
 		git cat-file blob "$OBJID" && RETVAL=: || \
 		{ RETVAL=false && : ; }
-	[ -e "$FHEAD.$$~" ] && command mv -f "$FHEAD.$$~" "$FHEAD" && $RETVAL
+	[ -e "$FHEAD.$$~" ] && command mv -f "$FHEAD.$$~" "$FHEAD" || :
+	$RETVAL
 }
 
 anon_commit()
