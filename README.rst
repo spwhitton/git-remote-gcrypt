@@ -38,7 +38,7 @@ Quickstart
         git remote add cryptremote gcrypt::rsync://example.com:repo
         git push cryptremote master
         > gcrypt: Setting up new repository
-        > gcrypt: Repository ID is :SHA256:3a29d035adf234af7e[... ]
+        > gcrypt: Repository ID is :id:7VigUnLVYVtZx8oir34R
         > [ more lines .. ]
         > To gcrypt::[...]
         > * [new branch]      master -> master
@@ -153,12 +153,12 @@ Manifest file
     pack :SHA256:f2ad50316fbca42c553810aec3709c24974585ec1b34aae77d5cd4ba67092dc4 z8YoAnFpMlWPIYG8wo1adewd4Fp7Fo3PkI2mND49P1qm
     pack :SHA256:a6e17bb4c042bdfa8e38856ee6d058d0c0f0c575ace857c4795426492f379584 82+k2cbiUn7i2cW0dgXfyX6wXGpvVaQGj5sF59Y8my5W
     keep :SHA256:f2ad50316fbca42c553810aec3709c24974585ec1b34aae77d5cd4ba67092dc4 1
-    repo :SHA256:ef8e52a7ea96761f713c14caa7190b5f3b55ff87ffe091cab40f7cbe1d3b5b96
+    repo :id:OYiSleGirtLubEVqJpFF
 
 Each item extends until newline, and matches one of the following forms:
 
-``[0-9a-f]{40} <gitref>``
-    SHA-1 and its git ref
+``<sha-1> <gitref>``
+    Git object id and its ref
 
 ``pack :<hashtype>:<hash> <key>``
     Packfile hash (`Hi`) and corresponding symmetric key (`Ki`).
@@ -166,7 +166,7 @@ Each item extends until newline, and matches one of the following forms:
 ``keep :<hashtype>:<hash> <generation>``
     Packfile hash and its repack generation
 
-``repo :<hashtype>:<hash>``
+``repo <id>``
     The repository id
 
 ``extn <name> ...``

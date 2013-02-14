@@ -312,7 +312,7 @@ make_new_repo()
 	PUTREPO "$URL"
 
 	# Needed assumption: the same user should have no duplicate Repoid
-	Repoid=":${Hashtype}:$(genkey 64 | pack_hash)"
+	Repoid=":id:$(genkey 15)"
 	iseq "${NAME#gcrypt::}" "$URL" || {
 		git config "remote.$NAME.gcrypt-id" "$Repoid"
 		fix_config=1
@@ -454,13 +454,14 @@ ensure_connected()
 	rcv_repoid=${rcv_repoid% *}
 	if isnull "$Repoid"
 	then
-		echo_info "Remote repo ID is $rcv_repoid"
+		echo_info "Remote ID is $rcv_repoid"
 		Repoid=$rcv_repoid
 	elif isnoteq "$rcv_repoid" "$Repoid"
 	then
 		echo_info "WARNING:"
-		echo_info "WARNING: Remote repository ID has changed!"
-		echo_info "WARNING: to $rcv_repoid"
+		echo_info "WARNING: Remote Repository ID has changed!"
+		echo_info "WARNING: from $Repoid"
+		echo_info "WARNING: to   $rcv_repoid"
 		echo_info "WARNING:"
 		Repoid=$rcv_repoid
 	else
