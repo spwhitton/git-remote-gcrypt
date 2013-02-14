@@ -39,28 +39,23 @@ CONFIGURATION
  + NOTE: We use the user's gnupg configuration for `cipher-algo` and so on!
          Configure your gnupg to use strong crypto -- see `man gpg`.
 
- + Set `git config gcrypt.signmanifest 1` to also sign the manifest (the
-   list of branches and packfiles) when pushing. This is optional and
-   using signed git tags might be an alternative.
- + Set `git config gcrypt.requiresign 1` to fail and stop if no valid
-   signature is found on the manifest.
- 
 
 REPOSITORY FORMAT
 
- + The masterkey is first signed, then encrypted using `gpg -e` with
-   hidden recipients and stored on the remote.
- + The manifest contains the list of branches and packfiles, and an
-   optional signature
+ + The manifest is signed+encrypted using `gpg -se` (with hidden recipients)
+   and stored on the remote.
+ + The manifest contains the list of branches and packfiles.
 
     $ cd MyCryptedRemote
     $ ls 
-    -rw--  11K 00ef27cc2c5b76365e1a46479ed7429e16572c543cdff0a8bf745c7c
-    -rw--  41K b934d8d6c0f48e71b9d7a4d5ea56f024a9bed4f6f2c6f8e688695bee
-    -rw--  577 manifest
-    -rw-- 1.3K masterkey
+    -rw-- 11K 00ef27cc2c5b76365e1a46479ed7429e16572c543cdff0a8bf745c7c
+    -rw-- 41K b934d8d6c0f48e71b9d7a4d5ea56f024a9bed4f6f2c6f8e688695bee
+    -rw-- 577 manifest
     
-    $ gpg -d masterkey | gpg -d | gpg --passphrase-fd 0 -d manifest
+    $ gpg -d manifest
+    T+pCUr/1FxbBC93ABIiIgG36EgqaxvgdNYjdmRSueGkgGETc4Qs7di+/yIsq2R5GysiqFaR0 \
+    bGSWf9omsoAH84hmED/kR/ZQiOGT/vg2Pg7CGI0xzdlW9GQjeFBAo4vsDDDBxrn5L7F9E532 \
+    LOnnPLSIZD7BpmyY/oZiXoP5Vlw=
     b4a4a39365d19282810c19d0f3f24d04dd2d179f refs/tags/something
     1d323ddadf4cf1d80fced447e637ab3766b168b7 refs/heads/master
     pack :SHA224:00ef27cc2c5b76365e1a46479ed7429e16572c543cdff0a8bf745c7c
@@ -69,21 +64,24 @@ REPOSITORY FORMAT
 
  + Protocol sketch
 
-   gpg -c is symmetric encryption, for example AES
-   gpg -e is encrypting to a PGP key holder
-   gpg -s adds a signature
+   EncSign(X) is sign+encrypting to a PGP key holder
+   Encrypt(K,X) is symmetric encryption
 
-   master key M, generated once, 128 bytes
-   file `masterkey' contains   cat M | gpg -s | gpg -e > `masterkey'
-   manifest and packfiles are encrypted    cat FILE | gpg -c --passphrase M
+   K: master key, generated once, 128 bytes
+   B: branch list
+   L: list of packfiles and hashes
+   
+   Store Manifest as EncSign(K || B || L)
+   Each packfile P is stored as P' = Encrypt(K,P) and named SHA224(P')
+   L is the list of names of P'.
 
-   To read repository
-   decrypt  cat `masterkey' | gpg -d | gpg --verify > M
-   decrypt  cat FILE.crypt  | gpg -d --passphrase M
 
-   The masterkey is decrypted and its signature is verified before
-   reading or writing of any other file. Only packs mentioned in `manifest`
-   are downloaded.
-   Pack hashes are verified when fetched. The filename is simply the hash
-   of the packfile.
+   To read the repository
+
+   decrypt+verify Manifest using private key -> (K, B, L)
+   for each packfile P' in L:
+       verify  P' matches its hash
+       decrypt P' using K -> P -> open P with git
+
+   Only packs mentioned in L are downloaded.
 

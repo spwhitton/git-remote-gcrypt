@@ -9,22 +9,12 @@
 #set -x
 set -e
 
-genkey()
-{
-	gpg --armor --gen-rand 1 128 | tr -d \\n
-}
-
-pack_hash()
-{
-	local HASH=$(gpg --with-colons --print-md SHA224 | tr A-F a-f)
-	HASH=${HASH#:*:}; printf "%s" "${HASH%:}"
-}
-
-LOCALDIR="${GIT_DIR:-.git}/remote-gcrypt"
 DID_FIND_REPO=  # yes for connected, no for no repo
-PACKPFX="pack :SHA224:"
+LOCALDIR="${GIT_DIR:-.git}/remote-gcrypt"
 export GITCEPTION="$GITCEPTION+" # Reuse $GREF except when stacked
-GREF="refs/gcrypt/gitception.$GITCEPTION"
+GREF="refs/gcrypt/gitception$GITCEPTION"
+MANIFESTFILE=5e4a937219be20f8a9a16ae7b35a83db0c16ce501d27b231dbad6586
+PACKPFX="pack :SHA224:"
 
 isurl() { test -z "${2%%$1://*}" ; }
 
@@ -74,9 +64,9 @@ update_tree()
 # depends on previous GET to set $GREF and depends on PUT_FINAL later
 gitception_put()
 {
-	OBJID=$(git hash-object -w --stdin) && \
+	OBJID=$(git hash-object -w --stdin) &&
 		TREEID=$(update_tree "$GREF" "$2" "$OBJID") &&
-		COMMITID=$(anon_commit "$TREEID" -m "x") && \
+		COMMITID=$(anon_commit "$TREEID" -m "x") &&
 		git update-ref "$GREF" "$COMMITID"
 }
 ## end gitception
@@ -157,59 +147,53 @@ CLEAN_FINAL()
 
 ENCRYPT()
 {
-	# Security protocol:
-	# Symmetric encryption using the long MASTERKEY.
-	(printf "%s" "$MASTERKEY" | \
+	(printf "%s" "$MASTERKEY" |
 		gpg --batch --force-mdc --compress-algo none \
 			--passphrase-fd 0 --output - -c /dev/fd/3) 3<&0
 }
 
 DECRYPT()
 {
-	(printf "%s" "$MASTERKEY" | \
+	(printf "%s" "$MASTERKEY" |
 		gpg -q --batch --no-default-keyring --secret-keyring /dev/null \
 			--keyring /dev/null \
 			--passphrase-fd 0 --output - -d /dev/fd/3) 3<&0
 }
 
-CLEARSIGN()
+# Encrypt to recipients $1
+PRIVENCRYPT()
 {
-	if [ "$CONF_SIGN_MANIFEST" = "true" ]
-	then
-		echo_info "Requesting manifest signature for push"
-		gpg --output - --clearsign
-	else
-		cat
-	fi
-}
-
-# Require both gpg success and status word $1
-gpg_check_status()
-{
-	local STATUS
-	local ARG
-	ARG=$1 ; shift;
-	STATUS=$(gpg --status-fd 3 "$@" 3>&1 1>&4) 4>&1 &&
-		printf "%s" "$STATUS" | grep "^\[GNUPG:\] $ARG " >/dev/null
-}
-
-VERIFYSIGN()
-{
-	gpg_check_status "GOODSIG" -q --batch --no-default-keyring \
-		--secret-keyring /dev/null --keyring "$CONF_KEYRING" -d
+	gpg --no-default-keyring --keyring "$CONF_KEYRING" \
+		--compress-algo none -se $1
 }
 
 PRIVDECRYPT()
 {
-	gpg_check_status "ENC_TO" -q -d
+	local STATUS
+	STATUS=$(gpg --no-default-keyring --keyring "$CONF_KEYRING" \
+		--status-fd 3 -q -d 3>&1 1>&4) 4>&1 &&
+	printf "%s" "$STATUS" | grep "^\[GNUPG:\] ENC_TO " >/dev/null &&
+	(printf "%s" "$STATUS" | grep "^\[GNUPG:\] GOODSIG " >/dev/null || {
+		echo_info "Failed to verify manifest signature!" && return 1
+	})
+}
+
+genkey()
+{
+	gpg --armor --gen-rand 1 128 | tr -d \\n
+}
+
+pack_hash()
+{
+	local HASH=$(gpg --with-colons --print-md SHA224 | tr A-F a-f)
+	HASH=${HASH#:*:}; printf "%s" "${HASH%:}"
 }
 
 
 # Append $2 to $1 with a newline separator
 append()
 {
-	[ -n "$1" ] && printf "%s\n" "$1" || :
-	printf "%s\n" "$2"
+	[ -z "$1" ] || printf "%s\n" "$1" && printf "%s\n" "$2"
 }
 
 xgrep() { command grep "$@" || : ; }
@@ -217,18 +201,12 @@ sort_C() { LC_ALL=C command sort "$@"; }
 tac() { sed '1!G;h;$!d'; }
 echo_info() { echo "gcrypt:" "$@" >&2; }
 
-make_new_repo()
+check_recipients()
 {
-	# Security protocol:
-	# The MASTERKEY is encrypted to all RECIPIENTS. The key is a long
-	# ascii-encoded string used for symmetric encryption with GnuPG.
-	local RECIPIENTS
-	local KEYSIGN
-	echo_info "Setting up new repository at $URL"
 	RECIPIENTS="$(gpg --no-default-keyring --keyring "$CONF_KEYRING" \
-		--with-colons -k | xgrep ^pub | cut -f5 -d:)"
+		--with-colons -k | xgrep ^pub | cut -f5 -d: | tr '\n' ' ')"
 	# Split recipients by space, example "a b c" =>  -R a -R b -R c
-	RECIPIENTS=$(printf "%s" $RECIPIENTS | sed -e 's/\([^ ]\+\)/-R &/g')
+	RECIPIENTS=$(printf "%s" "$RECIPIENTS" | sed -e 's/\([^ ]\+\)/-R &/g')
 	if [ -z "$RECIPIENTS" ]
 	then
 		echo_info "You must configure a keyring for the repository."
@@ -237,94 +215,52 @@ make_new_repo()
 		echo_info "  git config gcrypt.keyring <path-to-keyring>"
 		exit 1
 	fi
-	PUTREPO "$URL"
-	echo_info "Generating master key"
-	echo_info "Requesting master key signature"
-	MASTERKEY="$(genkey)"
-	KEYSIGN=$(printf "%s\n" "$MASTERKEY" | gpg --output - --clearsign)
-	TMPMASTERKEY_ENC="$LOCALDIR/masterenc.$$"
-	trap 'rm -f "$TMPMASTERKEY_ENC"' EXIT
-	echo_info "Encrypting masterkey to \"$RECIPIENTS\""
-	printf "%s" "$KEYSIGN" | gpg --batch --no-default-keyring \
-		--secret-keyring /dev/null --keyring "$CONF_KEYRING" \
-		--compress-algo none -e $RECIPIENTS > "$TMPMASTERKEY_ENC"
-	PUT "$URL" masterkey < "$TMPMASTERKEY_ENC"
-	rm -f "$TMPMASTERKEY_ENC"
-	trap EXIT
 }
 
-get_masterkey()
+make_new_repo()
 {
-	# The master key and its clearsigned versions are safe to keep
-	# as text in variables
-	local MASTERKEYDEC
-	TMPMASTERKEY_ENC="$LOCALDIR/masterenc.$$"
-	trap 'rm -f "$TMPMASTERKEY_ENC"' EXIT
-	GET "$URL" masterkey 2>/dev/null > "$TMPMASTERKEY_ENC" || return 0
-	MASTERKEYDEC=$(PRIVDECRYPT < "$TMPMASTERKEY_ENC") || {
-		echo_info "Decryption of master key failed!"
-		exit 1
-	}
-	echo_info "Verifying master key signature"
-	printf "%s" "$MASTERKEYDEC" | VERIFYSIGN || {
-		echo_info "Failed to verify master key signature!"
-		echo_info "Using keyring $CONF_KEYRING"
-		if [ "$CONF_KEYRING" = "/dev/null" ] ; then
-		echo_info "Please configure gcrypt.keyring"
-		fi
-		exit 1
-	}
-	rm -f "$TMPMASTERKEY_ENC"
-	trap EXIT
+	echo_info "Setting up new repository at $URL"
+	PUTREPO "$URL"
+	echo_info "Generating master key"
+	MASTERKEY="$(genkey)"
 }
 
 
 read_config()
 {
-	CONF_SIGN_MANIFEST=$(git config --bool gcrypt.signmanifest || :)
-	CONF_REQUIRE_SIGN=$(git config --bool gcrypt.requiresign || :)
 	CONF_KEYRING=$(git config --path gcrypt.keyring || printf "/dev/null")
 }
 
 ensure_connected()
 {
-	local MANIFESTDATA
-	local STRIPDATA
+	local MANIFEST
 
 	if [ -n "$DID_FIND_REPO" ]
 	then
 		return
 	fi
-	DID_FIND_REPO=yes
+	DID_FIND_REPO=no
 	read_config
 
-	MASTERKEY="$(get_masterkey)"
-	if [ -z "$MASTERKEY" ]
-	then
-		DID_FIND_REPO=no
-		return
-	fi
-	MANIFESTDATA="$(GET "$URL" manifest | DECRYPT)"
-	if [ "$CONF_REQUIRE_SIGN" = true -o -z "${MANIFESTDATA##-----BEGIN*}" ]
-	then
-		# Use gpg to verify and strip the signature
-		echo_info "Verifying manifest signature"
-		STRIPDATA="$(printf "%s" "$MANIFESTDATA" | VERIFYSIGN || {
-			echo_info "WARNING: Failed to verify manifest signature"
-			echo_info "WARNING: Using keyring $CONF_KEYRING"
-			if [ "$CONF_KEYRING" = "/dev/null" ] ; then
-			echo_info "WARNING: Please configure gcrypt.keyring"
-			fi
-			if [ "$CONF_REQUIRE_SIGN" = "true" ] ; then
-			echo_info "Exiting per gcrypt.requiresign" && exit 1
-			fi
-			}
-		)"
-		[ -n "$STRIPDATA" ] && MANIFESTDATA=$STRIPDATA || :
-	fi
-	[ -n "$MANIFESTDATA" ] || exit 1
-	BRANCHLIST=$(printf "%s\n" "$MANIFESTDATA" | xgrep -E '^[0-9a-f]{40}')
-	PACKLIST=$(printf "%s\n" "$MANIFESTDATA" | xgrep "^$PACKPFX")
+	TMPMANIFEST_ENC="$LOCALDIR/manifest.$$"
+	trap 'rm -f "$TMPMANIFEST_ENC"' EXIT
+	GET "$URL" "$MANIFESTFILE" 2>/dev/null > "$TMPMANIFEST_ENC" || return 0
+
+	DID_FIND_REPO=yes
+	echo_info "Decrypting manifest"
+	MANIFEST=$(PRIVDECRYPT < "$TMPMANIFEST_ENC") && [ -n "$MANIFEST" ] || {
+		echo_info "Failed to decrypt manifest!"
+		echo_info "Using keyring $CONF_KEYRING"
+		if [ "$CONF_KEYRING" = "/dev/null" ] ; then
+			echo_info "NOTE: Please configure gcrypt.keyring"
+		fi
+		exit 1
+	}
+	rm -f "$TMPMANIFEST_ENC"
+	trap EXIT
+	MASTERKEY=$(printf "%s\n" "$MANIFEST" | head -n 1)
+	BRANCHLIST=$(printf "%s\n" "$MANIFEST" | xgrep -E '^[0-9a-f]{40} ')
+	PACKLIST=$(printf "%s\n" "$MANIFEST" | xgrep "^$PACKPFX")
 }
 
 do_capabilities()
@@ -392,7 +328,7 @@ do_fetch()
 			echo_info "Packfile $PACK does not match digest!"
 			exit 1
 		fi
-		DECRYPT < "$TMPPACK_ENCRYPTED" | \
+		DECRYPT < "$TMPPACK_ENCRYPTED" |
 			git index-pack -v --stdin >/dev/null
 		# add to local pack list
 		printf "$PACKPFX%s\n" "$PACK">>"$LOCALDIR/have_packs$GITCEPTION"
@@ -416,6 +352,7 @@ do_push()
 	local prefix_
 	local suffix_
 	ensure_connected
+	check_recipients
 
 	if [ "$DID_FIND_REPO" = "no" ]
 	then
@@ -439,7 +376,8 @@ do_push()
 		if [ -n "$prefix_" ]
 		then
 			printf "%s " "$prefix_"
-			printf "%s %s\n" "$(git rev-parse "$prefix_")" "$suffix_" >> "$TMPMANIFEST"
+			printf "%s %s\n" "$(git rev-parse "$prefix_")" \
+				"$suffix_" >> "$TMPMANIFEST"
 		# else delete
 		fi
 	done)"
@@ -460,11 +398,26 @@ do_push()
 		PUT "$URL" "$PACKID" < "$TMPPACK_ENCRYPTED"
 	fi
 
-	# Put new manifest
-	SIGNMANIFEST=$(printf "%s\n%s\n" "$BRANCHLIST" "$PACKLIST" | CLEARSIGN)
-	printf "%s\n" "$SIGNMANIFEST" | ENCRYPT | PUT "$URL" "manifest"
+	rm -f "$TMPPACK_ENCRYPTED"
+	rm -f "$TMPMANIFEST"
+	rm -f "$TMPOBJLIST"
+	trap EXIT
+
+	# Update manifest
+	echo_info "Encrypting manifest to \"$RECIPIENTS\""
+	echo_info "Requesting manifest key signature"
+
+	TMPMANIFEST_ENC="$LOCALDIR/manifest.$$"
+	trap 'rm -f "$TMPMANIFEST_ENC"' EXIT
+
+	printf "%s\n%s\n%s\n" "$MASTERKEY" "$BRANCHLIST" "$PACKLIST" |
+		PRIVENCRYPT "$RECIPIENTS" > "$TMPMANIFEST_ENC"
+	PUT "$URL" "$MANIFESTFILE" < "$TMPMANIFEST_ENC"
 
 	PUT_FINAL "$URL"
+
+	rm -f "$TMPMANIFEST_ENC"
+	trap EXIT
 
 	# ok all updates (not deletes)
 	printf "%s\n" "$1" | while read LINE
@@ -479,19 +432,15 @@ do_push()
 		fi
 	done
 	
-	rm -f "$TMPPACK_ENCRYPTED"
-	rm -f "$TMPMANIFEST"
-	rm -f "$TMPOBJLIST"
-	trap EXIT
 	echo 
 }
 
 # Main program, check $URL is supported
 NAME=$1
 URL=$2
-( isurl ssh "$URL" || isurl sftp "$URL" || isurl gitception "$URL" || \
-	test -z ${URL##/*} ) || \
-	{ echo_info "Supported URLs: gitception://<giturl>, Absolute path, sftp://, ssh://" ; exit 1 ; }
+( isurl ssh "$URL" || isurl sftp "$URL" ||
+	isurl gitception "$URL" || test -z ${URL##/*} ) || {
+	echo_info "Supported URLs: gitception://<giturl>, Absolute path, sftp://, ssh://" && exit 1 ; }
 
 mkdir -p "$LOCALDIR"
 
