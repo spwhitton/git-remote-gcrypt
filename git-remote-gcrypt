@@ -88,7 +88,7 @@ ENCRYPT()
 	# Symmetric encryption using the long MASTERKEY. We use AES
 	# and OpenPGP's modification detection code (mdc).
 	(printf "%s" "$MASTERKEY" | \
-		gpg --batch --force-mdc --cipher-algo AES \
+		gpg --batch --force-mdc --cipher-algo AES --compress-algo none \
 			--passphrase-fd 0 --output - -c /dev/fd/3) 3<&0
 }
 
@@ -127,7 +127,8 @@ make_new_repo()
 	PUTREPO "$URL"
 	echo_info "Generating new master key"
 	MASTERKEY="$(genkey)"
-	printf "%s" "$MASTERKEY" | gpg -e $RECIPIENTS | PUT "$URL" masterkey
+	printf "%s" "$MASTERKEY" | \
+		gpg --compress-algo none -e $RECIPIENTS | PUT "$URL" masterkey
 }
 
 ensure_connected()
