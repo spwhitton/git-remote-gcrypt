@@ -81,6 +81,8 @@ the repo, further key management features do not yet exist.
 GPG configuration applies to public-key encryption, symmetric
 encryption, and signing. See `man gpg` for more information.
 
+*GCRYPT_FULL_REPACK*
+        This environment variable forces full repack when pushing.
 
 Examples
 ========

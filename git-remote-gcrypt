@@ -430,6 +430,12 @@ repack_if_needed()
 	did_repack=no
 	isnonnull "$Packlist" || return 0
 
+	if isnonnull "$GCRYPT_FULL_REPACK"
+	then
+		Keeplist=
+		Repack_limit=1
+	fi
+
 	premote_=$(xecho "$Packlist" | cut -f 1-2 -d ' ')
 	pkeep_=$(xecho "$Keeplist" | cut -f 2 -d ' ')
 
