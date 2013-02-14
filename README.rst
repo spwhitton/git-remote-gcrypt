@@ -21,10 +21,7 @@ the repository is stored as a set of files, or instead any `<giturl>`
 where gcrypt will store the same representation in a git repository,
 bridged over arbitrary git transport.
 
-.. NOTE:: This is a development version -- Repository format WILL change
-          incompatibly soon again, secure protocol is done I think, but
-          we will make it easier to use by doing away with the multiple
-          repositories per URL and other things.
+.. NOTE:: This is a development version -- Repository format MAY CHANGE.
 
 Quickstart
 ..........

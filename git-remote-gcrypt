@@ -745,7 +745,7 @@ URL=$2   # Remote URL
 mkdir -p "$Localdir"
 
 trap 'rm -f "$Localdir/tmp_"*".$$"' EXIT 1 2 3 15
-echo_info "Development version -- Repository format WILL CHANGE in the future"
+echo_info "Development version -- Repository format MAY CHANGE"
 
 while read Input
 do
