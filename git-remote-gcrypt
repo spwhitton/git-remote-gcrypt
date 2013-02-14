@@ -13,6 +13,7 @@ Did_find_repo=  # yes for connected, no for no repo
 Localdir="${GIT_DIR:-.git}/remote-gcrypt"
 export GITCEPTION="$GITCEPTION+" # Reuse $Gref except when stacked
 Gref="refs/gcrypt/gitception$GITCEPTION"
+Gref_rbranch="refs/heads/master"
 Repoid=
 Packpfx="pack :SHA224:"
 
@@ -55,7 +56,7 @@ gitception_get()
 	# Take care to preserve FETCH_HEAD
 	local ret_=: obj_id= f_head="$GIT_DIR/FETCH_HEAD"
 	[ -e "$f_head" ] && command mv -f "$f_head" "$f_head.$$~" || :
-	git fetch -q -f "$1" HEAD:"$Gref" 2>/dev/tty >/dev/null &&
+	git fetch -q -f "$1" "$Gref_rbranch:$Gref" 2>/dev/tty >/dev/null &&
 		obj_id="$(git ls-tree "$Gref" | xgrep -E '\b'"$2"'$' | awk '{print $3}')" &&
 		isnonnull "$obj_id" && git cat-file blob "$obj_id" && ret_=: ||
 		{ ret_=false && : ; }
@@ -69,7 +70,7 @@ anon_commit()
 	GIT_AUTHOR_DATE="1356994801 -0400" GIT_COMMITTER_NAME="root" \
 	GIT_COMMITTER_EMAIL="root@localhost" \
 	GIT_COMMITTER_DATE="1356994801 -0400" \
-		git commit-tree "$@"
+		git commit-tree -m x "$@"
 }
 
 # Get 'tree' from $1, change file $2 to obj id $3
@@ -88,7 +89,18 @@ gitception_put()
 	local obj_id= tree_id= commit_id=
 	obj_id=$(git hash-object -w --stdin) &&
 		tree_id=$(update_tree "$Gref" "$2" "$obj_id") &&
-		commit_id=$(anon_commit "$tree_id" -m "x") &&
+		commit_id=$(anon_commit "$tree_id") &&
+		git update-ref "$Gref" "$commit_id"
+}
+
+gitception_new_repo()
+{
+	local empty_tree=4b825dc642cb6eb9a060e54bf8d69288fbee4904
+	# get any file to update Gref, and if it's not updated we create empty
+	git update-ref -d "$Gref" || :
+	gitception_get "$1" "x" || :
+	git rev-parse -q --verify "$Gref" >/dev/null && return 0 ||
+		commit_id=$(anon_commit "$empty_tree") &&
 		git update-ref "$Gref" "$commit_id"
 }
 ## end gitception
@@ -134,7 +146,7 @@ PUT_FINAL()
 {
 	if isurl gitception "$1"
 	then
-		git push --quiet -f "${1#gitception://}" "$Gref":master
+		git push --quiet -f "${1#gitception://}" "$Gref:$Gref_rbranch"
 	else
 		:
 	fi
@@ -152,8 +164,7 @@ PUTREPO()
 		:
 	elif isurl gitception "$1"
 	then
-		# FIXME
-		:
+		gitception_new_repo "${1#gitception://}"
 	else
 		mkdir -p "$1"
 	fi
