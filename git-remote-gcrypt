@@ -17,7 +17,6 @@ Gref="refs/gcrypt/gitception$GITCEPTION"
 Gref_rbranch="refs/heads/master"
 Packkey_bytes=33  # 33 random bytes for passphrase, still compatible if changed
 Hashtype=SHA256   # SHA512 SHA384 SHA256 SHA224 supported.
-Packpat="pack :*:"
 Manifestfile=91bd0c092128cf2e60e1a608c31e92caf1f9c1595f83f2890ef17c0e4881aa0a
 Hex40="[a-f0-9]"
 Hex40=$Hex40$Hex40$Hex40$Hex40$Hex40$Hex40$Hex40$Hex40
@@ -79,13 +78,6 @@ append_to()
 	eval f_append_tmp_=\$${1#@}
 	isnull "$f_append_tmp_" || f_append_tmp_=$f_append_tmp_$Newline
 	setvar "$1" "$f_append_tmp_$2"
-}
-
-# Split $1 into $2:$3
-splitcolon()
-{
-	setvar "$2" "${1%%:*}"
-	setvar "$3" "${1#*:}"
 }
 
 # Pick words from each line
@@ -559,31 +551,31 @@ get_verify_decrypt_pack()
 # $1 destdir (when repack, else "")
 get_pack_files()
 {
-	local pack_id= r_pack_key_line= r_htype= r_pack= key_=
-	while read -r _ pack_id # <<here-document
+	local pack_id= r_pack_key_line= htype_= pack_= key_=
+	while IFS=': ' read -r _ htype_ pack_ # <<here-document
 	do
-		isnonnull "$pack_id" || continue
+		isnonnull "$pack_" || continue
 
 		# Get the Packlist line with the key
+		pack_id=":${htype_}:$pack_"
 		filter_to @r_pack_key_line "pack $pack_id *" "$Packlist"
-		key_=${r_pack_key_line#pack "$pack_id" }
+		key_=${r_pack_key_line#pack $pack_id }
 
-		splitcolon "${pack_id#:}" @r_htype @r_pack
-		if isnonnull "${r_pack##$Hex40*}" ||
-			isnoteq "$r_htype" SHA256 && isnoteq "$r_htype" SHA224 &&
-			isnoteq "$r_htype" SHA384 && isnoteq "$r_htype" SHA512
+		if isnonnull "${pack_##$Hex40*}" ||
+			isnoteq "$htype_" SHA256 && isnoteq "$htype_" SHA224 &&
+			isnoteq "$htype_" SHA384 && isnoteq "$htype_" SHA512
 		then
 			echo_die "Packline malformed: $pack_id"
 		fi
 
-		get_verify_decrypt_pack "$r_htype" "$r_pack" "$key_" | \
+		get_verify_decrypt_pack "$htype_" "$pack_" "$key_" | \
 		if isnull "${1:-}"
 		then
 			# add to local pack list
 			git index-pack -v --stdin >/dev/null
 			xecho "pack $pack_id" >> "$Localdir/have_packs$GITCEPTION"
 		else
-			git index-pack -v --stdin "$1/${r_pack}.pack" >/dev/null
+			git index-pack -v --stdin "$1/${pack_}.pack" >/dev/null
 		fi
 	done
 }
@@ -693,8 +685,8 @@ do_push()
 	# Each git packfile is encrypted and then named for the encrypted
 	# file's hash. The manifest is updated with the pack id.
 	# The manifest is encrypted.
-	local r_revlist= line_= pack_id= r_pack_id= key_= obj_= \
-		r_pack_delete= r_src= r_dst= tmp_encrypted= tmp_objlist=
+	local r_revlist= pack_id= key_= obj_= src_= dst_= \
+		r_pack_delete= tmp_encrypted= tmp_objlist=
 
 	ensure_connected
 
@@ -710,18 +702,16 @@ do_push()
 			safe_git_rev_parse | sed -e 's/^\(.\)/^&/')
 	fi
 
-	while read line_ # from <<
+	while IFS=: read -r src_ dst_ # << +src:dst
 	do
-		# +src:dst -- remove leading + then split at :
-		splitcolon "${line_#+}" @r_src @r_dst
+		src_=${src_#+}
+		filter_to ! @Refslist "$Hex40 $dst_" "$Refslist"
 
-		filter_to ! @Refslist "$Hex40 $r_dst" "$Refslist"
-
-		if isnonnull "$r_src"
+		if isnonnull "$src_"
 		then
-			append_to @r_revlist "$r_src"
-			obj_=$(xecho "$r_src" | safe_git_rev_parse)
-			append_to @Refslist "$obj_ $r_dst"
+			append_to @r_revlist "$src_"
+			obj_=$(xecho "$src_" | safe_git_rev_parse)
+			append_to @Refslist "$obj_ $dst_"
 		fi
 	done <<EOF
 $1
@@ -779,23 +769,23 @@ EOF
 	# Delete packs
 	if isnonnull "$r_pack_delete"; then
 		rm -r -f "$Localdir/pack"
-		REMOVE "$URL" "$(xecho "$r_pack_delete" | while read packline_
-		do
-			isnonnull "$packline_" || continue
-			pack_=${packline_#$Packpat}
-			xecho "$pack_"
-		done)"
+		REMOVE "$URL" "$(xecho "$r_pack_delete" | \
+			while IFS=': ' read -r _ _ pack_
+			do
+				isnonnull "$pack_" || continue
+				xecho "$pack_"
+			done)"
 	fi
 
 	PUT_FINAL "$URL"
 
 	# ok all updates
-	xecho "$1" | while read line_
+	while IFS=: read -r src_ dst_ # << +src:dst
 	do
-		# +src:dst -- remove leading + then split at :
-		splitcolon "${line_#+}" @r_src @r_dst
-		echo_git "ok $r_dst"
-	done
+		echo_git "ok $dst_"
+	done <<EOF
+$1
+EOF
 	
 	echo_git 
 }
