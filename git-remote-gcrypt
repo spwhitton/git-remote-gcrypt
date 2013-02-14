@@ -8,7 +8,6 @@
 
 #set -x
 set -e
-LANG=C
 
 genkey()
 {
@@ -165,6 +164,7 @@ append()
 	printf "%s\n" "$2"
 }
 
+sort_C() { LC_ALL=C command sort "$@"; }
 tac() { sed '1!G;h;$!d'; }
 echo_info() { echo "gcrypt:" "$@" >&2; }
 
@@ -289,8 +289,8 @@ do_fetch()
 
 	# Needed packs is  REMOTE - (HAVE & REMOTE)
 	PHAVE="$(cat "$LOCALDIR/have_packs" 2>/dev/null || :)"
-	PBOTH="$(printf "%s\n%s" "$PACKLIST" "$PHAVE" | sort | uniq -d)"
-	PNEED="$(printf "%s\n%s" "$PACKLIST" "$PBOTH" | sort | uniq -u)"
+	PBOTH="$(printf "%s\n%s" "$PACKLIST" "$PHAVE" | sort_C | uniq -d)"
+	PNEED="$(printf "%s\n%s" "$PACKLIST" "$PBOTH" | sort_C | uniq -u)"
 
 	printf "%s\n" "$PNEED" | while read PACKLINE
 	do
@@ -353,7 +353,7 @@ do_push()
 	done)"
 
 	# POSIX compat issue: sort -s (stable), but supported in bsd and gnu
-	BRANCHLIST="$(sort -k2 -s "$TMPMANIFEST" | tac | uniq -s40)"
+	BRANCHLIST="$(sort_C -k2 -s "$TMPMANIFEST" | tac | uniq -s40)"
 
 	TMPPACK_ENCRYPTED="$LOCALDIR/tmp_pack_ENCRYPTED_.$$"
 	TMPOBJLIST="$LOCALDIR/tmp_packrevlist.$$"
