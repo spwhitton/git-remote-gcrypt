@@ -52,9 +52,10 @@ anon_commit()
 # Get 'tree' from $1, change file $2 to obj id $3
 update_tree()
 {
+	local tab_="	"
 	# $2 is a filename from the repo format
 	(git ls-tree "$1" | xgrep -v -E '\b'"$2"'$';
-		printf "100644 blob %s\t%s" "$3" "$2") | git mktree
+		xecho "100644 blob $3$tab_$2") | git mktree
 }
 
 # Put giturl $1, file $2
@@ -86,9 +87,6 @@ GET()
 		cat "$1/$2"
 	fi
 }
-
-# Fetch repo $1, file $2 or return encrypted empty message
-GET_OR_EMPTY() { GET "$@" 2>/dev/null || (printf "" | ENCRYPT) ; }
 
 # Put repo $1, file $2 or fail
 PUT()
@@ -145,17 +143,19 @@ CLEAN_FINAL()
 
 ENCRYPT()
 {
-	(printf "%s" "$Masterkey" |
-		gpg --batch --force-mdc --compress-algo none \
-			--passphrase-fd 0 --output - -c /dev/fd/3) 3<&0
+	gpg --batch --force-mdc --compress-algo none \
+		--passphrase-fd 3 -c  3<<EOF
+$Masterkey
+EOF
 }
 
 DECRYPT()
 {
-	(printf "%s" "$Masterkey" |
-		gpg -q --batch --no-default-keyring --secret-keyring /dev/null \
-			--keyring /dev/null \
-			--passphrase-fd 0 --output - -d /dev/fd/3) 3<&0
+	gpg -q --batch --no-default-keyring --secret-keyring /dev/null \
+		--keyring /dev/null \
+		--passphrase-fd 3 -d  3<<EOF
+$Masterkey
+EOF
 }
 
 # Encrypt to recipients $1
@@ -171,8 +171,8 @@ PRIVDECRYPT()
 	exec 4>&1 &&
 	status_=$(gpg --no-default-keyring --keyring "$Conf_keyring" \
 		--status-fd 3 -q -d 3>&1 1>&4) &&
-	printf "%s" "$status_" | grep "^\[GNUPG:\] ENC_TO " >/dev/null &&
-	(printf "%s" "$status_" | grep "^\[GNUPG:\] GOODSIG " >/dev/null || {
+	xecho "$status_" | grep "^\[GNUPG:\] ENC_TO " >/dev/null &&
+	(xecho "$status_" | grep "^\[GNUPG:\] GOODSIG " >/dev/null || {
 		echo_info "Failed to verify manifest signature!" && return 1
 	})
 }
@@ -184,21 +184,31 @@ genkey()
 
 pack_hash()
 {
-	local hash_="$(gpg --with-colons --print-md SHA224 | tr A-F a-f)"
-	hash_=${hash_#:*:}; printf "%s" "${hash_%:}"
+	local hash_=
+	hash_=$(gpg --with-colons --print-md SHA224 | tr A-F a-f)
+	hash_=${hash_#:*:}
+	xecho "${hash_%:}"
 }
 
 
 # Append $2 to $1 with a newline separator
 append()
 {
-	[ -z "$1" ] || printf "%s\n" "$1" && printf "%s\n" "$2"
+	[ -z "$1" ] || xecho "$1" && xecho "$2"
 }
 
 xgrep() { command grep "$@" || : ; }
 sort_C() { LC_ALL=C command sort "$@"; }
 tac() { sed '1!G;h;$!d'; }
-echo_info() { echo "gcrypt:" "$@" >&2; }
+xecho()
+{
+	cat <<EOF
+$@
+EOF
+}
+xecho_n() { xecho "$@" | tr -d \\n ; } # kill newlines
+echo_git() { xecho "$@" ; }  # Code clarity
+echo_info() { xecho "gcrypt:" "$@" >&2; }
 echo_die() { echo_info "$@" ; exit 1; }
 
 check_recipients()
@@ -206,7 +216,7 @@ check_recipients()
 	Recipients="$(gpg --no-default-keyring --keyring "$Conf_keyring" \
 		--with-colons -k | xgrep ^pub | cut -f5 -d: | tr '\n' ' ')"
 	# Split recipients by space, example "a b c" =>  -R a -R b -R c
-	Recipients=$(printf "%s" "$Recipients" | sed -e 's/\([^ ]\+\)/-R &/g')
+	Recipients=$(xecho_n "$Recipients" | sed -e 's/\([^ ]\+\)/-R &/g')
 	if [ -z "$Recipients" ]
 	then
 		echo_info "You must configure a keyring for the repository."
@@ -228,8 +238,8 @@ make_new_repo()
 	# The manifest will be stored at SHA224(urlid_)
 	# Needed assumption: the same user should have no duplicate urlid_
 	# For now, we use 20 random hex digits (80 bits), can be increased
-	urlid_=$(printf "%.20s" "$(genkey | pack_hash)")
-	Repoid=$(printf "%s" "$urlid_" | pack_hash)
+	urlid_=$(genkey | pack_hash | cut -c 1-20)
+	Repoid=$(xecho_n "$urlid_" | pack_hash)
 	echo_info "Repository ID is" "$urlid_"
 	[ "${NAME#gcrypt::}" != "$URL" ] && {
 		git config "remote.$NAME.url" "gcrypt::$URL/G/$urlid_"
@@ -242,7 +252,7 @@ make_new_repo()
 
 read_config()
 {
-	Conf_keyring=$(git config --path gcrypt.keyring || printf "/dev/null")
+	Conf_keyring=$(git config --path gcrypt.keyring || xecho "/dev/null")
 }
 
 ensure_connected()
@@ -261,7 +271,7 @@ ensure_connected()
 	[ "$url_id" = "$URL" ] && url_id= && return 0 || :
 
 	URL=${URL%/G/"$url_id"}
-	Repoid=$(printf "%s" "$url_id" | pack_hash)
+	Repoid=$(xecho_n "$url_id" | pack_hash)
 
 	TmpManifest_Enc="$Localdir/manifest.$$"
 	trap 'rm -f "$TmpManifest_Enc"' EXIT
@@ -270,7 +280,8 @@ ensure_connected()
 
 	Did_find_repo=yes
 	echo_info "Decrypting manifest"
-	manifest_=$(PRIVDECRYPT < "$TmpManifest_Enc") &&[ -n "$manifest_" ] || {
+	manifest_=$(PRIVDECRYPT < "$TmpManifest_Enc") && 
+		[ "${#manifest_}" -gt 0 ] || {
 		echo_info "Failed to decrypt manifest!"
 		echo_info "Using keyring $Conf_keyring"
 		if [ "$Conf_keyring" = "/dev/null" ] ; then
@@ -280,18 +291,19 @@ ensure_connected()
 	}
 	rm -f "$TmpManifest_Enc"
 	trap 0
-	Masterkey=$(printf "%s\n" "$manifest_" | head -n 1)
-	Branchlist=$(printf "%s\n" "$manifest_" | xgrep -E '^[0-9a-f]{40} ')
-	Packlist=$(printf "%s\n" "$manifest_" | xgrep "^$Packpfx")
-	rcv_repoid=$(printf "%s\n" "$manifest_" | xgrep "^repo ")
+
+	Masterkey=$(xecho "$manifest_" | head -n 1)
+	Branchlist=$(xecho "$manifest_" | xgrep -E '^[0-9a-f]{40} ')
+	Packlist=$(xecho "$manifest_" | xgrep "^$Packpfx")
+	rcv_repoid=$(xecho "$manifest_" | xgrep "^repo ")
 	[ "repo $Repoid" = "$rcv_repoid" ] || echo_die "Repository id mismatch!"
 }
 
 do_capabilities()
 {
-	echo fetch
-	echo push
-	echo
+	echo_git fetch
+	echo_git push
+	echo_git
 }
 
 do_list()
@@ -299,20 +311,20 @@ do_list()
 	local obj_id= ref_name= line_=
 	ensure_connected
 
-	printf "%s\n" "$Branchlist" | while read line_
+	xecho "$Branchlist" | while read line_
 	do
 		[ -z "$line_" ] && break
 		obj_id=${line_%% *}
 		ref_name=${line_##* }
-		echo "$obj_id" "$ref_name"
+		echo_git "$obj_id" "$ref_name"
 		if [ "$ref_name" = "refs/heads/master" ]
 		then
-			echo "@refs/heads/master HEAD"
+			echo_git "@refs/heads/master HEAD"
 		fi
 	done
 
 	# end with blank line
-	echo
+	echo_git
 }
 
 do_fetch()
@@ -327,7 +339,7 @@ do_fetch()
 
 	if [ -z "$Packlist" ]
 	then
-		echo # end with blank line
+		echo_git # end with blank line
 		return
 	fi
 
@@ -337,10 +349,10 @@ do_fetch()
 	# Needed packs is  Packlist - (phave & Packlist)
 	# The `+` for $GITCEPTION is pointless but we will be safe for stacking
 	phave_="$(cat "$Localdir/have_packs+" 2>/dev/null || :)"
-	pboth_="$(printf "%s\n%s" "$Packlist" "$phave_" | sort_C | uniq -d)"
-	pneed_="$(printf "%s\n%s" "$Packlist" "$pboth_" | sort_C | uniq -u)"
+	pboth_="$( (xecho "$Packlist"; xecho "$phave_") | sort_C | uniq -d)"
+	pneed_="$( (xecho "$Packlist"; xecho "$pboth_") | sort_C | uniq -u)"
 
-	printf "%s\n" "$pneed_" | while read packline_
+	xecho "$pneed_" | while read packline_
 	do
 		[ -z "$packline_" ] && break
 		pack_=${packline_#"$Packpfx"}
@@ -353,13 +365,12 @@ do_fetch()
 		DECRYPT < "$TmpPack_Encrypted" |
 			git index-pack -v --stdin >/dev/null
 		# add to local pack list
-		printf "%s%s\n" "$Packpfx" "$pack_" \
-			>> "$Localdir/have_packs$GITCEPTION"
+		xecho "$Packpfx$pack_" >> "$Localdir/have_packs$GITCEPTION"
 	done
 
 	rm -f "$TmpPack_Encrypted"
 	trap 0
-	echo # end with blank line
+	echo_git # end with blank line
 }
 
 # do_push PUSHARGS (multiple lines like +src:dst, with both + and src opt.)
@@ -369,7 +380,7 @@ do_push()
 	# Each git packfile is encrypted and then named for the encrypted
 	# file's hash. The manifest is updated with the pack id.
 	# The manifest is encrypted.
-	local remote_has= remote_want= prefix_= suffix_=
+	local remote_has= remote_want= prefix_= suffix_= line_= new_branch=
 
 	ensure_connected
 	check_recipients
@@ -379,31 +390,31 @@ do_push()
 		make_new_repo
 	fi
 
-	trap 'rm -f "$TmpManifest" "$TmpPack_Encrypted" "$TmpObjlist"' EXIT
-	TmpManifest="$Localdir/tmp_new_manifest_.$$"
-	touch "$TmpManifest"
+	trap 'rm -f "$TmpPack_Encrypted" "$TmpObjlist"' EXIT
 	if [ -n "$Branchlist" ]
 	then
-		printf "%s\n" "$Branchlist" >"$TmpManifest"
-		remote_has=$(printf "%s" "$Branchlist" | \
-			     cut -f1 -d' ' | sed -e s/^/^/ | tr '\n' ' ')
+		remote_has=$(xecho "$Branchlist" |
+			cut -f1 -d' ' | sed -e 's/^\(.\)/^&/' | tr '\n' ' ')
 	fi
 
-	remote_want="$(printf "%s\n" "$1" | while read LINE
+	while read line_ # from <<
 	do
 		# +src:dst -- remove leading + then split at :
-		splitcolon "${LINE#+}"
+		splitcolon "${line_#+}"
 		if [ -n "$prefix_" ]
 		then
-			printf "%s " "$prefix_"
-			printf "%s %s\n" "$(git rev-parse "$prefix_")" \
-				"$suffix_" >> "$TmpManifest"
-		# else delete
+			remote_want="$remote_want$prefix_ "
+			Branchlist=$(append "$Branchlist" \
+				"$(git rev-parse "$prefix_") $suffix_")
+		else
+			:  # FIXME delete branch
 		fi
-	done)"
+	done <<EOF
+$1
+EOF
 
 	# POSIX compat issue: sort -s (stable), but supported in bsd and gnu
-	Branchlist="$(sort_C -k2 -s "$TmpManifest" | tac | uniq -s40)"
+	Branchlist=$(xecho "$Branchlist" | sort_C -k2 -s | tac | uniq -s40)
 
 	TmpPack_Encrypted="$Localdir/tmp_pack_ENCRYPTED_.$$"
 	TmpObjlist="$Localdir/tmp_packrevlist.$$"
@@ -419,7 +430,6 @@ do_push()
 	fi
 
 	rm -f "$TmpPack_Encrypted"
-	rm -f "$TmpManifest"
 	rm -f "$TmpObjlist"
 	trap 0
 
@@ -430,8 +440,12 @@ do_push()
 	TmpManifest_Enc="$Localdir/manifest.$$"
 	trap 'rm -f "$TmpManifest_Enc"' EXIT
 
-	printf "%s\n%s\n%s\n%s\n" "$Masterkey" "$Branchlist" "$Packlist" \
-		"repo $Repoid" | PRIVENCRYPT "$Recipients" > "$TmpManifest_Enc"
+	(xecho "$Masterkey"
+	xecho "$Branchlist"
+	xecho "$Packlist"
+	xecho "repo $Repoid") |
+		PRIVENCRYPT "$Recipients" > "$TmpManifest_Enc"
+
 	PUT "$URL" "$Repoid" < "$TmpManifest_Enc"
 
 	PUT_FINAL "$URL"
@@ -440,19 +454,19 @@ do_push()
 	trap 0
 
 	# ok all updates (not deletes)
-	printf "%s\n" "$1" | while read LINE
+	xecho "$1" | while read line_
 	do
 		# +src:dst -- remove leading + then split at :
-		splitcolon "${LINE#+}"
+		splitcolon "${line_#+}"
 		if [ -z "$prefix_" ]
 		then
-			echo "error $suffix_ delete not supported yet"
+			echo_git "error $suffix_ delete not supported yet"
 		else
-			echo "ok $suffix_"
+			echo_git "ok $suffix_"
 		fi
 	done
 	
-	echo 
+	echo_git 
 }
 
 # Main program, check $URL is supported
