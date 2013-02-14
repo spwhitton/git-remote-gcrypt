@@ -42,7 +42,7 @@ xgrep() { command grep "$@" || : ; }
 sort_C() { LC_ALL=C command sort "$@"; }
 sort_stable_k2()
 {
-	awk '{ printf("%08d\t%s\n", NR, $0) }' | sort_C -k3,3 -k1,1 | cut -f 2-
+	awk '{ printf("%08d\t%s\n", NR, $0) }' | sort_C -k 3,3 -k 1,1 |cut -f 2-
 }
 
 tac() { sed '1!G;h;$!d'; }
@@ -242,7 +242,7 @@ safe_git_rev_parse()
 check_recipients()
 {
 	Recipients="$(gpg --no-default-keyring --keyring "$Conf_keyring" \
-		--with-colons -k | xgrep ^pub | cut -f5 -d: | tr '\n' ' ')"
+		--with-colons -k | xgrep ^pub | cut -f 5 -d ':' | tr '\n' ' ')"
 	# Split recipients by space, example "a b c" =>  -R a -R b -R c
 	Recipients=$(xecho_n "$Recipients" | sed -e 's/\([^ ]\+\)/-R &/g')
 	if isnull "$Recipients"
@@ -360,7 +360,7 @@ do_list()
 do_fetch()
 {
 	# Security protocol:
-	# The PACK id is the SHA-1 of the encrypted git packfile.
+	# The PACK id is the hash of the encrypted git packfile.
 	# We only download packs mentioned in the encrypted manifest,
 	# and check their digest when received.
 	local pack_= rcv_id= packline_= pneed_= pboth_= phave_=
@@ -410,7 +410,7 @@ do_push()
 	# Each git packfile is encrypted and then named for the encrypted
 	# file's hash. The manifest is updated with the pack id.
 	# The manifest is encrypted.
-	local remote_has= remote_want= prefix_= suffix_= line_= new_branch=
+	local remote_has= remote_want= prefix_= suffix_= line_= pack_id=
 
 	ensure_connected
 	check_recipients
@@ -424,7 +424,7 @@ do_push()
 	if isnonnull "$Branchlist"
 	then
 		remote_has=$(xecho "$Branchlist" |
-			cut -f1 -d' ' | sed -e 's/^\(.\)/^&/')
+			cut -f 1 -d ' ' | sed -e 's/^\(.\)/^&/')
 	fi
 
 	while read line_ # from <<
@@ -443,7 +443,7 @@ do_push()
 $1
 EOF
 
-	Branchlist=$(xecho "$Branchlist" | sort_stable_k2 | tac | uniq -s40)
+	Branchlist=$(xecho "$Branchlist" | sort_stable_k2 | tac | uniq -s 40)
 
 	TmpPack_Encrypted="$Localdir/tmp_pack_ENCRYPTED_.$$"
 	TmpObjlist="$Localdir/tmp_packrevlist.$$"
