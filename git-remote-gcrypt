@@ -276,7 +276,7 @@ safe_git_rev_parse()
 make_new_repo()
 {
 	local urlid_= fix_config=
-	echo_info "Setting up new repository at $URL"
+	echo_info "Setting up new repository"
 	PUTREPO "$URL"
 
 	# We need a relatively short ID for URL+REPO
@@ -285,7 +285,6 @@ make_new_repo()
 	# For now, we arbitrarily use 9 random bytes (72 bits)
 	urlid_=$(genkey 9 | tr '/+' 'Zz')
 	Repoid=$(xecho_n "$urlid_" | pack_hash)
-	echo_info "Repository ID  is" "$urlid_"
 	iseq "${NAME#gcrypt::}" "$URL" || {
 		git config "remote.$NAME.url" "gcrypt::$URL#$urlid_"
 		fix_config=1
@@ -515,7 +514,7 @@ EOF
 	fi
 
 	# Generate manifest
-	echo_info "Encrypting manifest to \"$Recipients\""
+	echo_info "Participants are: $Signers"
 	echo_info "Requesting manifest signature"
 
 	TmpManifest_Enc="$Localdir/manifest.$$"

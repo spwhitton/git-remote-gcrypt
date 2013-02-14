@@ -41,8 +41,7 @@ Quickstart
 
         git remote add cryptremote gcrypt::ssh://example.com:repo
         git push cryptremote master
-        > gcrypt: Setting up new repository at ssh://example.com:repo
-        > gcrypt: Repository ID  is KNBr0wKzct52
+        > gcrypt: Setting up new repository
         > gcrypt: Repository URL is gcrypt::ssh://example.com:repo#KNBr0wKzct52
         > gcrypt: (configuration for cryptremote updated)
         > [ more lines .. ]
@@ -51,7 +50,7 @@ Quickstart
 
 * Share the updated Repository URL with all participants.
 
-(The generated Repository ID is not secret, it only exists to ensure
+(The generated Repository URL is not secret, it only exists to ensure
 that two repositories signed by the same user can not be maliciously
 switched around. It incidentally allows multiple repositories to all
 share location.)
