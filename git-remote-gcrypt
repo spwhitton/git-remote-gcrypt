@@ -39,9 +39,9 @@ echo_git() { xecho "$@" ; }  # Code clarity
 echo_info() { xecho "gcrypt:" "$@" >&2; }
 echo_die() { echo_info "$@" ; exit 1; }
 
-isnull() { case "${1}" in "") true;; *) false;; esac; }
+isnull() { case "$1" in "") return 0;; *) return 1;; esac; }
 isnonnull() { ! isnull "$1"; }
-iseq() { isnull "${1#"$2"}"; }
+iseq() { case "$1" in "$2") return 0;; *) return 1;; esac; }
 isnoteq() { ! iseq "$@"; }
 
 # Append $2 to $1 with a newline separator
