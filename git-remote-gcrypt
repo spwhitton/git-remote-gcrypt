@@ -213,7 +213,14 @@ pack_hash()
 	xecho "${hash_%:}"
 }
 
-
+# Pass the branch/ref by pipe to git
+safe_git_rev_parse()
+{
+	local out_=
+	out_=$(xecho "$1" | git cat-file --batch-check)
+	out_=${out_%%*missing}
+	xecho "${out_%% *}"
+}
 
 check_recipients()
 {
@@ -400,7 +407,7 @@ do_push()
 	if isnonnull "$Branchlist"
 	then
 		remote_has=$(xecho "$Branchlist" |
-			cut -f1 -d' ' | sed -e 's/^\(.\)/^&/' | tr '\n' ' ')
+			cut -f1 -d' ' | sed -e 's/^\(.\)/^&/')
 	fi
 
 	while read line_ # from <<
@@ -409,9 +416,9 @@ do_push()
 		splitcolon "${line_#+}"
 		if isnonnull "$prefix_"
 		then
-			remote_want="$remote_want$prefix_ "
+			remote_want=$(append "$remote_want" "$prefix_")
 			Branchlist=$(append "$Branchlist" \
-				"$(git rev-parse "$prefix_") $suffix_")
+				"$(safe_git_rev_parse "$prefix_") $suffix_")
 		else
 			:  # FIXME delete branch
 		fi
@@ -424,8 +431,10 @@ EOF
 
 	TmpPack_Encrypted="$Localdir/tmp_pack_ENCRYPTED_.$$"
 	TmpObjlist="$Localdir/tmp_packrevlist.$$"
-	git rev-list --objects $remote_has $remote_want -- | \
-		tee "$TmpObjlist" | \
+
+	append "$remote_has" "$remote_want" |
+		git rev-list --objects --stdin -- |
+		tee "$TmpObjlist" |
 		git pack-objects --stdout | ENCRYPT > "$TmpPack_Encrypted"
 	# Only send pack if we have any objects to send
 	if [ -s "$TmpObjlist" ]
