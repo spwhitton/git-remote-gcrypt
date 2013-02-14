@@ -125,6 +125,8 @@ make_new_repo()
 
 ensure_connected()
 {
+	local MANIFESTDATA
+
 	if [ ! -z "$DID_CONNECT" ]
 	then
 		return
@@ -132,6 +134,8 @@ ensure_connected()
 	DID_CONNECT=1
 	MASTERKEY="$(get_masterkey)"
 	MANIFESTDATA="$(GET_OR_EMPTY "$URL" manifest | DECRYPT)"
+	BRANCHLIST=$(printf "%s\n" "$MANIFESTDATA" | (grep -v '^pack ' || :))
+	PACKLIST=$(printf "%s\n" "$MANIFESTDATA" | (grep '^pack ' || :))
 }
 
 get_masterkey()
@@ -153,7 +157,7 @@ do_list()
 	local REFNAME
 	ensure_connected
 
-	printf "%s\n" "$MANIFESTDATA" | while read LINE
+	printf "%s\n" "$BRANCHLIST" | while read LINE
 	do
 		OBJID=${LINE%% *}
 		REFNAME=${LINE##* }
@@ -172,17 +176,14 @@ do_fetch()
 {
 	# Security protocol:
 	# The PACK id is the SHA-1 of the encrypted git packfile.
-	# We only download packs mentioned in the encrypted 'packfest',
+	# We only download packs mentioned in the encrypted manifest,
 	# and check their digest when received.
 	local PNEED
-	local PREMOTE
 	local PBOTH
 	local PHAVE
 	ensure_connected
 
-	touch "$LOCALDIR/packfest"
-	PREMOTE="$(GET_OR_EMPTY "$URL" packfest | DECRYPT)"
-	if [ -z "$PREMOTE" ]
+	if [ -z "$PACKLIST" ]
 	then
 		echo # end with blank line
 		exit 0
@@ -192,12 +193,13 @@ do_fetch()
 	trap 'rm -f "$TMPPACK_ENCRYPTED"' EXIT
 
 	# Needed packs is  REMOTE - (HAVE & REMOTE)
-	PHAVE="$(cat "$LOCALDIR/packfest")"
-	PBOTH="$(printf "%s\n%s" "$PREMOTE" "$PHAVE" | sort | uniq -d)"
-	PNEED="$(printf "%s\n%s" "$PREMOTE" "$PBOTH" | sort | uniq -u)"
+	PHAVE="$(cat "$LOCALDIR/have_packs" || :)"
+	PBOTH="$(printf "%s\n%s" "$PACKLIST" "$PHAVE" | sort | uniq -d)"
+	PNEED="$(printf "%s\n%s" "$PACKLIST" "$PBOTH" | sort | uniq -u)"
 
-	printf "%s\n" "$PNEED" | while read PACK
+	printf "%s\n" "$PNEED" | while read PACKLINE
 	do
+		PACK=${PACKLINE#pack }
 		RCVID="$(GET "$URL" "$PACK" | tee "$TMPPACK_ENCRYPTED" | sha1)"
 		if [ "$RCVID" != "$PACK" ]
 		then
@@ -207,7 +209,7 @@ do_fetch()
 		DECRYPT < "$TMPPACK_ENCRYPTED" | git unpack-objects
 
 		# add to local pack list
-		printf "%s\n" "$PACK" >> "$LOCALDIR/packfest"
+		printf "pack %s\n" "$PACK" >> "$LOCALDIR/have_packs"
 	done
 
 	rm -f "$TMPPACK_ENCRYPTED"
@@ -220,11 +222,11 @@ do_push()
 {
 	# Security protocol:
 	# Each git packfile is encrypted and then named for the encrypted
-	# file's SHA-1. `packfest` is updated with the pack id.
-	# The packfest and manifest are encrypted.
+	# file's SHA-1. The manifest is updated with the pack id.
+	# The manifest is encrypted.
 	local REMOTEHAS
 	local REMOTEWANT
-	local PACKFEST
+	local MANIFESTDATA
 	local prefix_
 	local suffix_
 	ensure_connected
@@ -237,10 +239,10 @@ do_push()
 	trap 'rm -f "$TMPMANIFEST" "$TMPPACK_ENCRYPTED" "$TMPOBJLIST"' EXIT
 	TMPMANIFEST="$LOCALDIR/tmp_new_manifest_.$$"
 	touch "$TMPMANIFEST"
-	if [ ! -z "$MANIFESTDATA" ]
+	if [ ! -z "$BRANCHLIST" ]
 	then
-		printf "%s\n" "$MANIFESTDATA" > "$TMPMANIFEST"
-		REMOTEHAS="$(printf "%s" "$MANIFESTDATA" | \
+		printf "%s\n" "$BRANCHLIST" >"$TMPMANIFEST"
+		REMOTEHAS="$(printf "%s" "$BRANCHLIST" | \
 			     cut -f1 -d' ' | sed -e s/^/^/ | tr '\n' ' ')"
 	fi
 
@@ -257,7 +259,7 @@ do_push()
 	done)"
 
 	# POSIX compat issue: sort -s (stable), but supported in bsd and gnu
-	MANIFESTDATA="$(sort -k2 -s "$TMPMANIFEST" | tac | uniq -s40)"
+	BRANCHLIST="$(sort -k2 -s "$TMPMANIFEST" | tac | uniq -s40)"
 
 	TMPPACK_ENCRYPTED="$LOCALDIR/tmp_pack_ENCRYPTED_.$$"
 	TMPOBJLIST="$LOCALDIR/tmp_packrevlist.$$"
@@ -268,18 +270,17 @@ do_push()
 	if [ -s "$TMPOBJLIST" ]
 	then
 		PACKID=$(sha1 < "$TMPPACK_ENCRYPTED")
-		PACKFEST="$(GET_OR_EMPTY "$URL" packfest | DECRYPT)"
-		if [ -z "$PACKFEST" ]
+		if [ -z "$PACKLIST" ]
 		then
-			PACKFEST="$(printf "%s\n" "$PACKID")"
+			PACKLIST="$(printf "pack %s\n" "$PACKID")"
 		else
-			PACKFEST="$(printf "%s\n%s\n" "$PACKFEST" "$PACKID")"
+			PACKLIST="$(printf "%s\npack %s\n" "$PACKLIST" "$PACKID")"
 		fi
 
 		PUT "$URL" "$PACKID" < "$TMPPACK_ENCRYPTED"
-		printf "%s\n" "$PACKFEST" | ENCRYPT | PUT "$URL" "packfest"
 	fi
 
+	MANIFESTDATA=$(printf "%s\n%s\n" "$BRANCHLIST" "$PACKLIST")
 	printf "%s\n" "$MANIFESTDATA" | ENCRYPT | PUT "$URL" "manifest"
 
 	# ok all updates (not deletes)
