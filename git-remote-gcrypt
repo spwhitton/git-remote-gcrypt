@@ -310,7 +310,7 @@ make_new_repo()
 	# The manifest will be stored at pack_hash($urlid_)
 	# Needed assumption: the same user should have no duplicate urlid_
 	# For now, we arbitrarily use 9 random bytes (72 bits)
-	urlid_=$(genkey 9 | tr '/+' 'Zz')
+	urlid_=$(genkey 9 | tr '+/' '-_')
 	Repoid=$(xecho_n "$urlid_" | pack_hash)
 	iseq "${NAME#gcrypt::}" "$URL" || {
 		git config "remote.$NAME.url" "gcrypt::$URL#$urlid_"
