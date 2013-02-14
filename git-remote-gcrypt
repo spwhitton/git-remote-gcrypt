@@ -442,7 +442,7 @@ repack_if_needed()
 	if isnull "$pkeep_"; then
 		n_=$(xecho "$Packlist" | wc -l)
 	else
-		n_=$(xecho "$Packlist" | grep -v -F -e "$pkeep_" | wc -l)
+		n_=$(xecho "$Packlist" | grep -v -e "$pkeep_" | wc -l)
 	fi
 	if [ $Repack_limit -gt "$n_" ]; then
 		return
@@ -458,7 +458,7 @@ repack_if_needed()
 	do
 		isnonnull "$packline_" || continue
 		if isnonnull "$pkeep_" &&
-			xecho "$packline_" | grep -q -F -e "$pkeep_"
+			xecho "$packline_" | grep -q -e "$pkeep_"
 		then
 			continue
 		fi
@@ -478,8 +478,8 @@ repack_if_needed()
 		Packlist_delete=$premote_
 		Packlist=
 	else
-		Packlist_delete=$(xecho "$premote_" | xgrep -v -F -e "$pkeep_")
-		Packlist=$(xecho "$Packlist" | xgrep -F -e "$pkeep_")
+		Packlist_delete=$(xecho "$premote_" | xgrep -v -e "$pkeep_")
+		Packlist=$(xecho "$Packlist" | xgrep -e "$pkeep_")
 	fi
 
 	pack_id=$(pack_hash < "$TmpPack_Encrypted")
@@ -537,7 +537,7 @@ do_fetch()
 	premote_=$(xecho "$Packlist" | cut -f 1-2 -d ' ')
 	# The `+` for $GITCEPTION is pointless but we will be safe for stacking
 	phave_="$(cat "$Localdir/have_packs+" 2>/dev/null || :)"
-	pneed_="$(xecho "$premote_" | xgrep -F -vx -e "$phave_")"
+	pneed_="$(xecho "$premote_" | xgrep -v -x -e "$phave_")"
 
 	xecho "$pneed_" | while read packline_
 	do
