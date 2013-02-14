@@ -18,7 +18,7 @@ Repoid=
 Hashpfx=":SHA224:"
 UrlTag="G."
 Packpfx="pack $Hashpfx"
-Packkey_len=48  # bytes of pack key
+Packkey_bytes=33
 
 # compat/utility functions
 xecho()
@@ -459,7 +459,7 @@ EOF
 
 	TmpPack_Encrypted="$Localdir/tmp_pack_ENCRYPTED_.$$"
 	TmpObjlist="$Localdir/tmp_packrevlist.$$"
-	key_=$(genkey "$Packkey_len")
+	key_=$(genkey "$Packkey_bytes")
 
 	append "$remote_has" "$remote_want" |
 		git rev-list --objects --stdin -- |
