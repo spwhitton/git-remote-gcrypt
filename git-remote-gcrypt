@@ -36,7 +36,7 @@ gitception_get()
 	[ -e "$FHEAD" ] && command mv -f "$FHEAD" "$FHEAD.$$~" || :
 	git fetch -q -f "$1" HEAD:"$GREF" 2>/dev/tty >/dev/null &&
 		OBJID="$(git ls-tree "$GREF" |
-			xgrep -E "\b$2$" | awk '{print $3}')" &&
+			xgrep -E '\b'"$2"'$' | awk '{print $3}')" &&
 		[ -n "$OBJID" ] && git cat-file blob "$OBJID" && RETVAL=: ||
 		{ RETVAL=false && : ; }
 	[ -e "$FHEAD.$$~" ] && command mv -f "$FHEAD.$$~" "$FHEAD" || :
@@ -56,7 +56,7 @@ anon_commit()
 update_tree()
 {
 	# $2 is a filename from the repo format
-	(git ls-tree "$1" | xgrep -v -E "\b$2$";
+	(git ls-tree "$1" | xgrep -v -E '\b'"$2"'$';
 		printf "100644 blob %s\t%s" "$3" "$2") | git mktree
 }
 
