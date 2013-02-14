@@ -1,5 +1,5 @@
 # git-remote-gcrypt
-# Copyright 2013  by Ulrik
+# Copyright 2013  by Ulrik Sverdrup
 # License: GPLv2 or any later version, see http://www.gnu.org/licenses/
 # Use GnuPG to use encrypted git remotes
 
@@ -10,10 +10,14 @@ INTRODUCTION
 
 Install as `git-remote-gcrypt` in $PATH
 
-Supports local, ssh:// and sftp:// remotes at the moment::
+Supports local, ssh:// and sftp:// remotes at the moment,
+as well as the special gitception://<giturl> remote type::
 
     git config --global gcrypt.recipients KEYID1
     git remote add gcryptrepo gcrypt::ssh://hostname.com:MyNewRepo
+     ( or maybe:
+       git remote add gcryptrepo gcrypt::gitception://git@github.com/Secrets
+       )
     git push --all gcryptrepo
 
 CONFIGURATION

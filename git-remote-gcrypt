@@ -81,8 +81,6 @@ update_tree()
 # Put repo $1, file $2 or fail
 PUT()
 {
-	local REPO
-
 	if isurl ssh "$1"
 	then
 		splitcolon "${1#ssh://}"
@@ -92,14 +90,25 @@ PUT()
 		curl -s -S -k --ftp-create-dirs -T - "$1/$2"
 	elif isurl gitception "$1"
 	then
-		REPO=${1#gitception://}
 		OBJID=$(git hash-object -w --stdin) && \
 			TREEID=$(update_tree "$GREF" "$2" "$OBJID") &&
 			COMMITID=$(anon_commit "$TREEID" -m "x") && \
-			git push -f "$REPO" "$COMMITID":master && \
 			git update-ref "$GREF" "$COMMITID"
 	else
 		cat > "$1/$2"
+	fi
+}
+
+# Put all PUT changes for repo $1 at once
+PUT_FINAL()
+{
+	local REPO
+	if isurl gitception "$1"
+	then
+		REPO=${1#gitception://}
+		git push --quiet -f "$REPO" "$GREF":master
+	else
+		:
 	fi
 }
 
@@ -362,6 +371,8 @@ do_push()
 	# Put new manifest
 	printf "%s\n%s\n" "$BRANCHLIST" "$PACKLIST" | \
 		CLEARSIGN | ENCRYPT | PUT "$URL" "manifest"
+
+	PUT_FINAL "$URL"
 
 	# ok all updates (not deletes)
 	printf "%s\n" "$1" | while read LINE
