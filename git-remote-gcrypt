@@ -317,7 +317,7 @@ make_new_repo()
 		git config "remote.$NAME.gcrypt-id" "$Repoid"
 		fix_config=1
 	}
-	echo_info "Repository ID is $Repoid"
+	echo_info "Remote ID is $Repoid"
 	Extension_list=$(xecho "extn comment")
 	#isnull "$fix_config" || echo_info "(configuration for $NAME updated)"
 }
@@ -459,7 +459,7 @@ ensure_connected()
 	elif isnoteq "$rcv_repoid" "$Repoid"
 	then
 		echo_info "WARNING:"
-		echo_info "WARNING: Remote Repository ID has changed!"
+		echo_info "WARNING: Remote ID has changed!"
 		echo_info "WARNING: from $Repoid"
 		echo_info "WARNING: to   $rcv_repoid"
 		echo_info "WARNING:"

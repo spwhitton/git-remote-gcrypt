@@ -21,6 +21,10 @@ the repository is stored as a set of files, or instead any `<giturl>`
 where gcrypt will store the same representation in a git repository,
 bridged over arbitrary git transport.
 
+The aim is to provide confidential, authenticated git storage and
+collaboration using typical untrusted file hosts or services.
+PLEASE help us evaluate how well we meet this design goal!
+
 .. NOTE:: This is a development version -- Repository format MAY CHANGE.
 
 Quickstart
@@ -35,23 +39,10 @@ Quickstart
         git remote add cryptremote gcrypt::rsync://example.com:repo
         git push cryptremote master
         > gcrypt: Setting up new repository
-        > gcrypt: Repository ID is :id:7VigUnLVYVtZx8oir34R
+        > gcrypt: Remote ID is :id:7VigUnLVYVtZx8oir34R
         > [ more lines .. ]
         > To gcrypt::[...]
         > * [new branch]      master -> master
-
-(The generated Repository ID is not secret, it only exists to ensure
-that two repositories signed by the same user can be distinguished.
-You will see a warning if the remote Repository ID changes, which will
-only happen if the remote was re-created or switched out.)
-
-Design Goals
-............
-
-Confidential, authenticated git storage and collaboration on any
-untrusted file host or service. The only information we (by necessity)
-leak is the approximate size and timing of updates.  PLEASE help me
-evaluate how well we meet this design goal!
 
 Configuration
 =============
@@ -76,13 +67,6 @@ The following ``git-config(1)`` variables are supported:
         (From regular git configuration) The key to use for signing.
         You should set ``user.signingkey`` if your default signing key is
         not part of the participant list.
-
-The encryption of the manifest is updated for each push. The pusher must
-have the public keys of all collaborators.  You can commit a keyring to
-the repo, further key management features do not yet exist.
-
-GPG configuration applies to public-key encryption, symmetric
-encryption, and signing. See `man gpg` for more information.
 
 Environment Variables
 =====================
@@ -111,6 +95,30 @@ The URL fragment (`#next` here) indicates which branch is used.
 Notes
 =====
 
+Collaboration
+    The encryption of the manifest is updated for each push to match the
+    participant configuration. Each pushing user must have the public
+    keys of all collaborators and correct participant config. You can
+    commit a keyring to the repo; further key management features do not
+    yet exist.
+
+Dependencies
+    ``rsync`` and ``curl`` for remotes ``rsync:`` and ``sftp:``
+    respectively. The main executable is a script for any
+    POSIX-compliant shell supporting ``local``.
+
+GNU Privacy Guard
+    GPG 1.4 or 2 are both supported. You need a configured personal
+    keypair. GPG configuration applies to algorithm choices for
+    public-key encryption, symmetric encryption, and signing. See
+    ``man gpg`` for more information.
+
+Remote ID
+    The generated Remote ID is not secret, it only exists to ensure that
+    two repositories signed by the same user can be distinguished.  You
+    will see a warning if the Remote ID changes, which should
+    only happen if the remote was re-created.
+
 Repository Format
 .................
 
@@ -126,7 +134,7 @@ Repository Format
 ``L``
     list of the hash (``Hi``) and key (``Ki``) for each packfile
 ``R``
-    Repository ID
+    Remote ID
 
 |
 | To write the repository:
@@ -138,7 +146,7 @@ Repository Format
 | To read the repository:
 |
 | Decrypt and verify manifest using GPG keyring ``-> (B, L, R)``
-| Warn if ``R`` does not match saved Repository ID for this remote
+| Warn if ``R`` does not match previously seen Remote ID
 | ``for each Hi, Ki in L``:
 |   Get file ``Hi`` from the server ``-> P'``
 |   Verify ``Hash(P')`` matches ``Hi``
