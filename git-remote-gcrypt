@@ -16,7 +16,30 @@ Gref="refs/gcrypt/gitception$GITCEPTION"
 Repoid=
 Packpfx="pack :SHA224:"
 
-isurl() { test -z "${2%%$1://*}" ; }
+# compat/utility functions
+xecho()
+{
+	cat <<EOF
+$@
+EOF
+}
+xecho_n() { xecho "$@" | tr -d \\n ; } # kill newlines
+echo_git() { xecho "$@" ; }  # Code clarity
+echo_info() { xecho "gcrypt:" "$@" >&2; }
+echo_die() { echo_info "$@" ; exit 1; }
+
+isnull() { [ 0 = "${#1}" ]; }
+isnonnull() { ! isnull "$1"; }
+iseq() { isnull "${1#"$2"}"; }
+isnoteq() { ! iseq "$@"; }
+
+# Append $2 to $1 with a newline separator
+append() { isnull "$1" || xecho "$1" && xecho "$2"; }
+isurl() { isnull "${2%%$1://*}"; }
+
+xgrep() { command grep "$@" || : ; }
+sort_C() { LC_ALL=C command sort "$@"; }
+tac() { sed '1!G;h;$!d'; }
 
 # Split $1 into $prefix_:$suffix_
 splitcolon()
@@ -34,7 +57,7 @@ gitception_get()
 	[ -e "$f_head" ] && command mv -f "$f_head" "$f_head.$$~" || :
 	git fetch -q -f "$1" HEAD:"$Gref" 2>/dev/tty >/dev/null &&
 		obj_id="$(git ls-tree "$Gref" | xgrep -E '\b'"$2"'$' | awk '{print $3}')" &&
-		[ -n "$obj_id" ] && git cat-file blob "$obj_id" && ret_=: ||
+		isnonnull "$obj_id" && git cat-file blob "$obj_id" && ret_=: ||
 		{ ret_=false && : ; }
 	[ -e "$f_head.$$~" ] && command mv -f "$f_head.$$~" "$f_head" || :
 	$ret_
@@ -191,25 +214,6 @@ pack_hash()
 }
 
 
-# Append $2 to $1 with a newline separator
-append()
-{
-	[ -z "$1" ] || xecho "$1" && xecho "$2"
-}
-
-xgrep() { command grep "$@" || : ; }
-sort_C() { LC_ALL=C command sort "$@"; }
-tac() { sed '1!G;h;$!d'; }
-xecho()
-{
-	cat <<EOF
-$@
-EOF
-}
-xecho_n() { xecho "$@" | tr -d \\n ; } # kill newlines
-echo_git() { xecho "$@" ; }  # Code clarity
-echo_info() { xecho "gcrypt:" "$@" >&2; }
-echo_die() { echo_info "$@" ; exit 1; }
 
 check_recipients()
 {
@@ -217,7 +221,7 @@ check_recipients()
 		--with-colons -k | xgrep ^pub | cut -f5 -d: | tr '\n' ' ')"
 	# Split recipients by space, example "a b c" =>  -R a -R b -R c
 	Recipients=$(xecho_n "$Recipients" | sed -e 's/\([^ ]\+\)/-R &/g')
-	if [ -z "$Recipients" ]
+	if isnull "$Recipients"
 	then
 		echo_info "You must configure a keyring for the repository."
 		echo_info "Use ::"
@@ -241,12 +245,12 @@ make_new_repo()
 	urlid_=$(genkey | pack_hash | cut -c 1-20)
 	Repoid=$(xecho_n "$urlid_" | pack_hash)
 	echo_info "Repository ID is" "$urlid_"
-	[ "${NAME#gcrypt::}" != "$URL" ] && {
+	isnoteq "${NAME#gcrypt::}" "$URL" && {
 		git config "remote.$NAME.url" "gcrypt::$URL/G/$urlid_"
 		fix_config=1
 	} || :
 	echo_info "Repository URL is" "gcrypt::$URL/G/$urlid_"
-	[ -n "$fix_config" ] && echo_info "(configuration for $NAME updated)"||:
+	isnonnull "$fix_config" && echo_info "(configuration for $NAME updated)"||:
 }
 
 
@@ -259,7 +263,7 @@ ensure_connected()
 {
 	local manifest_= rcv_repoid= url_id=
 
-	if [ -n "$Did_find_repo" ]
+	if isnonnull "$Did_find_repo"
 	then
 		return
 	fi
@@ -268,7 +272,7 @@ ensure_connected()
 
 	# split out Repoid from URL
 	url_id=${URL##*/G/}
-	[ "$url_id" = "$URL" ] && url_id= && return 0 || :
+	iseq "$url_id" "$URL" && url_id= && return 0 || :
 
 	URL=${URL%/G/"$url_id"}
 	Repoid=$(xecho_n "$url_id" | pack_hash)
@@ -281,10 +285,11 @@ ensure_connected()
 	Did_find_repo=yes
 	echo_info "Decrypting manifest"
 	manifest_=$(PRIVDECRYPT < "$TmpManifest_Enc") && 
-		[ "${#manifest_}" -gt 0 ] || {
+		isnonnull "$manifest_" || {
 		echo_info "Failed to decrypt manifest!"
 		echo_info "Using keyring $Conf_keyring"
-		if [ "$Conf_keyring" = "/dev/null" ] ; then
+		if iseq "$Conf_keyring" "/dev/null"
+		then
 			echo_info "NOTE: Please configure gcrypt.keyring"
 		fi
 		exit 1
@@ -296,7 +301,8 @@ ensure_connected()
 	Branchlist=$(xecho "$manifest_" | xgrep -E '^[0-9a-f]{40} ')
 	Packlist=$(xecho "$manifest_" | xgrep "^$Packpfx")
 	rcv_repoid=$(xecho "$manifest_" | xgrep "^repo ")
-	[ "repo $Repoid" = "$rcv_repoid" ] || echo_die "Repository id mismatch!"
+	iseq "repo $Repoid" "$rcv_repoid" ||
+		echo_die "Repository id mismatch!"
 }
 
 do_capabilities()
@@ -313,11 +319,11 @@ do_list()
 
 	xecho "$Branchlist" | while read line_
 	do
-		[ -z "$line_" ] && break
+		isnull "$line_" && break || :
 		obj_id=${line_%% *}
 		ref_name=${line_##* }
 		echo_git "$obj_id" "$ref_name"
-		if [ "$ref_name" = "refs/heads/master" ]
+		if iseq "$ref_name" "refs/heads/master"
 		then
 			echo_git "@refs/heads/master HEAD"
 		fi
@@ -337,7 +343,7 @@ do_fetch()
 
 	ensure_connected
 
-	if [ -z "$Packlist" ]
+	if isnull "$Packlist"
 	then
 		echo_git # end with blank line
 		return
@@ -354,11 +360,11 @@ do_fetch()
 
 	xecho "$pneed_" | while read packline_
 	do
-		[ -z "$packline_" ] && break
+		isnull "$packline_" && continue || :
 		pack_=${packline_#"$Packpfx"}
 		rcv_id="$(GET "$URL" "$pack_" | \
 			tee "$TmpPack_Encrypted" | pack_hash)"
-		if [ "$rcv_id" != "$pack_" ]
+		if isnoteq "$rcv_id" "$pack_"
 		then
 			echo_die "Packfile $pack_ does not match digest!"
 		fi
@@ -385,13 +391,13 @@ do_push()
 	ensure_connected
 	check_recipients
 
-	if [ "$Did_find_repo" = "no" ]
+	if iseq "$Did_find_repo" "no"
 	then
 		make_new_repo
 	fi
 
 	trap 'rm -f "$TmpPack_Encrypted" "$TmpObjlist"' EXIT
-	if [ -n "$Branchlist" ]
+	if isnonnull "$Branchlist"
 	then
 		remote_has=$(xecho "$Branchlist" |
 			cut -f1 -d' ' | sed -e 's/^\(.\)/^&/' | tr '\n' ' ')
@@ -401,7 +407,7 @@ do_push()
 	do
 		# +src:dst -- remove leading + then split at :
 		splitcolon "${line_#+}"
-		if [ -n "$prefix_" ]
+		if isnonnull "$prefix_"
 		then
 			remote_want="$remote_want$prefix_ "
 			Branchlist=$(append "$Branchlist" \
@@ -458,7 +464,7 @@ EOF
 	do
 		# +src:dst -- remove leading + then split at :
 		splitcolon "${line_#+}"
-		if [ -z "$prefix_" ]
+		if isnull "$prefix_"
 		then
 			echo_git "error $suffix_ delete not supported yet"
 		else
@@ -473,7 +479,7 @@ EOF
 NAME=$1
 URL=$2
 ( isurl ssh "$URL" || isurl sftp "$URL" ||
-	isurl gitception "$URL" || test -z ${URL##/*} ) ||
+	isurl gitception "$URL" || isnull ${URL##/*} ) ||
 	echo_die "Supported URLs: gitception://<giturl>, Absolute path, sftp://, ssh://"
 
 mkdir -p "$Localdir"
