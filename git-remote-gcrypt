@@ -239,20 +239,21 @@ ensure_connected()
 		DID_FIND_REPO=no
 		return
 	fi
-	MANIFESTDATA="$(GET_OR_EMPTY "$URL" manifest | DECRYPT)"
-	if [ -n "$MANIFESTDATA" -a \( "$CONF_REQUIRE_SIGN" = true -o \
-		-z "${MANIFESTDATA##-----BEGIN*}" \) ]
+	MANIFESTDATA="$(GET "$URL" manifest | DECRYPT)"
+	if [ "$CONF_REQUIRE_SIGN" = true -o -z "${MANIFESTDATA##-----BEGIN*}" ]
 	then
 		# Use gpg to verify and strip the signature
 		echo_info "Verifying manifest signature"
-		STRIPDATA=$(printf "%s" "$MANIFESTDATA" | gpg --batch || {
-		echo_info "WARNING: Failed to verify signature from $URL"
-		[ "$CONF_REQUIRE_SIGN" = "true" ] && \
+		STRIPDATA="$(printf "%s" "$MANIFESTDATA" | gpg --batch || {
+			echo_info "WARNING: Failed to verify signature from $URL"
+			if [ "$CONF_REQUIRE_SIGN" = "true" ] ; then
 			echo_info "Exiting per gcrypt.requiresign" && exit 1
-		}
-		)
-		[ -n "$STRIPDATA" ] && MANIFESTDATA=$STRIPDATA
+			fi
+			}
+		)"
+		[ -n "$STRIPDATA" ] && MANIFESTDATA=$STRIPDATA || :
 	fi
+	[ -n "$MANIFESTDATA" ] || exit 1
 	BRANCHLIST=$(printf "%s\n" "$MANIFESTDATA" | xgrep -E '^[0-9a-f]{40}')
 	PACKLIST=$(printf "%s\n" "$MANIFESTDATA" | xgrep "^$PACKPFX")
 }
@@ -346,6 +347,7 @@ do_push()
 	# file's hash. The manifest is updated with the pack id.
 	# The manifest is encrypted.
 	local REMOTEHAS
+	local SIGNMANIFEST
 	local REMOTEWANT
 	local prefix_
 	local suffix_
@@ -395,8 +397,8 @@ do_push()
 	fi
 
 	# Put new manifest
-	printf "%s\n%s\n" "$BRANCHLIST" "$PACKLIST" | \
-		CLEARSIGN | ENCRYPT | PUT "$URL" "manifest"
+	SIGNMANIFEST=$(printf "%s\n%s\n" "$BRANCHLIST" "$PACKLIST" | CLEARSIGN)
+	printf "%s\n" "$SIGNMANIFEST" | ENCRYPT | PUT "$URL" "manifest"
 
 	PUT_FINAL "$URL"
 
