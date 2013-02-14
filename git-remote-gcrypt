@@ -221,7 +221,7 @@ ensure_connected()
 	then
 		# Use gpg to verify and strip the signature
 		echo_info "Verifying manifest signature"
-		STRIPDATA=$(printf "%s" "$MANIFESTDATA" | gpg || {
+		STRIPDATA=$(printf "%s" "$MANIFESTDATA" | gpg --batch || {
 		echo_info "WARNING: Failed to verify signature from $URL"
 		[ "$CONF_REQUIRE_SIGN" = "true" ] && \
 			echo_info "Exiting per gcrypt.requiresign" && exit 1
@@ -235,7 +235,7 @@ ensure_connected()
 
 get_masterkey()
 {
-	GET "$URL" masterkey 2>/dev/null | gpg -q --batch -d || :
+	GET "$URL" masterkey 2>/dev/null | gpg -q -d || :
 }
 
 do_capabilities()
