@@ -328,7 +328,8 @@ read_config()
 	local recp_= key_line= cap_= conf_keyring= conf_part=
 	Conf_signkey=$(git config --path user.signingkey || :)
 	conf_keyring=$(git config --path gcrypt.keyring || :)
-	conf_part=$(git config --get gcrypt.participants '.+' || :)
+	conf_part=$(git config --get "remote.$NAME.gcrypt-participants" '.+' ||
+		    git config --get gcrypt.participants '.+' || :)
 
 	# Figure out which keys we should encrypt to or accept signatures from
 	if isnonnull "$conf_keyring" && isnull "$conf_part"
@@ -337,6 +338,14 @@ read_config()
 			  "use gcrypt.participants instead."
 		conf_part=$(gpg --no-default-keyring --keyring "$conf_keyring" \
 		--with-colons --fast-list -k | grep ^pub | cut -f 5 -d :)
+	fi
+
+	if isnull "$conf_part" || iseq "$conf_part" simple
+	then
+		Signers="(default keyring)"
+		Recipients="--throw-keyids --default-recipient-self"
+		Goodsig="^\[GNUPG:\] GOODSIG "
+		return 0
 	fi
 
 	for recp_ in $conf_part
@@ -662,7 +671,7 @@ EOF
 	fi
 
 	# Generate manifest
-	echo_info "Participants are: $Signers"
+	echo_info "Encrypting to: $Recipients"
 	echo_info "Requesting manifest signature"
 
 	TmpManifest_Enc="$Localdir/tmp_manifest.$$"
