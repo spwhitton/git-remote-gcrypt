@@ -23,8 +23,7 @@ sha1()
 }
 
 LOCALDIR="${GIT_DIR:-.git}/remote-gcrypt"
-DUMMYKEY="00000000000000000000"
-DID_CONNECT=
+DID_FIND_REPO=  # yes for connected, no for no repo
 
 isurl() { test -z "${2%%$1://*}" ; }
 
@@ -99,6 +98,13 @@ DECRYPT()
 		gpg -q --batch --passphrase-fd 0 --output - -d /dev/fd/3) 3<&0
 }
 
+# Append $2 to $1 with a newline separator
+append()
+{
+	[ -n "$1" ] && printf "%s\n" "$1" || :
+	printf "%s\n" "$2"
+}
+
 tac() { sed '1!G;h;$!d'; }
 echo_info() { echo "$@" >&2; }
 
@@ -127,12 +133,17 @@ ensure_connected()
 {
 	local MANIFESTDATA
 
-	if [ ! -z "$DID_CONNECT" ]
+	if [ -n "$DID_FIND_REPO" ]
 	then
 		return
 	fi
-	DID_CONNECT=1
+	DID_FIND_REPO=yes
 	MASTERKEY="$(get_masterkey)"
+	if [ -z "$MASTERKEY" ]
+	then
+		DID_FIND_REPO=no
+		return
+	fi
 	MANIFESTDATA="$(GET_OR_EMPTY "$URL" manifest | DECRYPT)"
 	BRANCHLIST=$(printf "%s\n" "$MANIFESTDATA" | (grep -v '^pack ' || :))
 	PACKLIST=$(printf "%s\n" "$MANIFESTDATA" | (grep '^pack ' || :))
@@ -140,8 +151,7 @@ ensure_connected()
 
 get_masterkey()
 {
-	(GET "$URL" masterkey 2>/dev/null || : ) | \
-	       (gpg -q --batch -d || printf "%s" "$DUMMYKEY")
+	GET "$URL" masterkey 2>/dev/null | gpg -q --batch -d || :
 }
 
 do_capabilities()
@@ -186,14 +196,14 @@ do_fetch()
 	if [ -z "$PACKLIST" ]
 	then
 		echo # end with blank line
-		exit 0
+		return
 	fi
 
 	TMPPACK_ENCRYPTED="$LOCALDIR/tmp_pack_ENCRYPTED_.$$"
 	trap 'rm -f "$TMPPACK_ENCRYPTED"' EXIT
 
 	# Needed packs is  REMOTE - (HAVE & REMOTE)
-	PHAVE="$(cat "$LOCALDIR/have_packs" || :)"
+	PHAVE="$(cat "$LOCALDIR/have_packs" 2>/dev/null || :)"
 	PBOTH="$(printf "%s\n%s" "$PACKLIST" "$PHAVE" | sort | uniq -d)"
 	PNEED="$(printf "%s\n%s" "$PACKLIST" "$PBOTH" | sort | uniq -u)"
 
@@ -231,7 +241,7 @@ do_push()
 	local suffix_
 	ensure_connected
 
-	if [ "$MASTERKEY" = "$DUMMYKEY" ]
+	if [ "$DID_FIND_REPO" = "no" ]
 	then
 		make_new_repo
 	fi
@@ -239,7 +249,7 @@ do_push()
 	trap 'rm -f "$TMPMANIFEST" "$TMPPACK_ENCRYPTED" "$TMPOBJLIST"' EXIT
 	TMPMANIFEST="$LOCALDIR/tmp_new_manifest_.$$"
 	touch "$TMPMANIFEST"
-	if [ ! -z "$BRANCHLIST" ]
+	if [ -n "$BRANCHLIST" ]
 	then
 		printf "%s\n" "$BRANCHLIST" >"$TMPMANIFEST"
 		REMOTEHAS="$(printf "%s" "$BRANCHLIST" | \
@@ -250,7 +260,7 @@ do_push()
 	do
 		# +src:dst -- remove leading + then split at :
 		splitcolon "${LINE#+}"
-		if [ ! -z "$prefix_" ]
+		if [ -n "$prefix_" ]
 		then
 			printf "%s " "$prefix_"
 			printf "%s %s\n" "$(git rev-parse "$prefix_")" "$suffix_" >> "$TMPMANIFEST"
@@ -270,13 +280,7 @@ do_push()
 	if [ -s "$TMPOBJLIST" ]
 	then
 		PACKID=$(sha1 < "$TMPPACK_ENCRYPTED")
-		if [ -z "$PACKLIST" ]
-		then
-			PACKLIST="$(printf "pack %s\n" "$PACKID")"
-		else
-			PACKLIST="$(printf "%s\npack %s\n" "$PACKLIST" "$PACKID")"
-		fi
-
+		PACKLIST=$(append "$PACKLIST" "pack $PACKID")
 		PUT "$URL" "$PACKID" < "$TMPPACK_ENCRYPTED"
 	fi
 
@@ -343,7 +347,7 @@ do
 			#echo_info "Got: (for push) $INPUTX"
 			case "$INPUTX" in
 			push\ *)
-			PUSH_ARGS="$(printf "%s\n%s" "$PUSH_ARGS" "${INPUTX#push }")"
+			PUSH_ARGS=$(append "$PUSH_ARGS" "${INPUTX#push }")
 			;;
 			*)
 			break
