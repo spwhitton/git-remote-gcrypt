@@ -16,9 +16,10 @@ Gref="refs/gcrypt/gitception$GITCEPTION"
 Gref_rbranch="refs/heads/master"
 Repoid=
 Packkey_bytes=33  # 33 random bytes for passphrase, still compatible if changed
-Hashtype=SHA224   # incompatible if changed
-Packpfx="pack :${Hashtype}:"
-Keeppfx="keep :${Hashtype}:"
+Hashtype=SHA256   # SHA512 SHA384 SHA256 SHA224 supported.
+Packpat="pack :*:"
+Manifestfile=91bd0c092128cf2e60e1a608c31e92caf1f9c1595f83f2890ef17c0e4881aa0a
+Urlfrag=
 
 Branchlist=
 Packlist=
@@ -68,7 +69,7 @@ splitcolon()
 	prefix_=${1%%:*}
 	suffix_=${1#*:}
 }
-repoidstr() { xecho "repo :${Hashtype}:$Repoid 1"; }
+repoidstr() { xecho "repo $Repoid"; }
 
 ## gitception part
 # Fetch giturl $1, file $2
@@ -77,7 +78,7 @@ gitception_get()
 	# Take care to preserve FETCH_HEAD
 	local ret_=: obj_id= f_head="$GIT_DIR/FETCH_HEAD"
 	[ -e "$f_head" ] && command mv -f "$f_head" "$f_head.$$~" || :
-	git fetch -q -f "$1" "$Gref_rbranch:$Gref" 2>/dev/tty >/dev/null &&
+	git fetch -q -f "$1" "refs/heads/${Urlfrag:-master}:$Gref" 2>/dev/tty >/dev/null &&
 		obj_id="$(git ls-tree "$Gref" | xgrep -E '\b'"$2"'$' | awk '{print $3}')" &&
 		isnonnull "$obj_id" && git cat-file blob "$obj_id" && ret_=: ||
 		{ ret_=false && : ; }
@@ -180,7 +181,8 @@ PUT_FINAL()
 	then
 		:
 	else
-		git push --quiet -f "${1#gitception://}" "$Gref:$Gref_rbranch"
+		git push --quiet -f "${1#gitception://}" \
+			"$Gref:refs/heads/${Urlfrag:-master}"
 	fi
 }
 
@@ -285,13 +287,16 @@ genkey()
 	gpg --armor --gen-rand 1 "$1"
 }
 
-pack_hash()
+gpg_hash()
 {
 	local hash_=
-	hash_=$(gpg --with-colons --print-md "$Hashtype" | tr A-F a-f)
+	hash_=$(gpg --with-colons --print-md "$1" | tr A-F a-f)
 	hash_=${hash_#:*:}
 	xecho "${hash_%:}"
 }
+
+pack_hash() { gpg_hash "$Hashtype"; }
+
 
 # Pass the branch/ref by pipe to git
 safe_git_rev_parse()
@@ -306,19 +311,15 @@ make_new_repo()
 	echo_info "Setting up new repository"
 	PUTREPO "$URL"
 
-	# We need a relatively short ID for URL+REPO
-	# The manifest will be stored at pack_hash($urlid_)
-	# Needed assumption: the same user should have no duplicate urlid_
-	# For now, we arbitrarily use 9 random bytes (72 bits)
-	urlid_=$(genkey 9 | tr '+/' '-_')
-	Repoid=$(xecho_n "$urlid_" | pack_hash)
+	# Needed assumption: the same user should have no duplicate Repoid
+	Repoid=":${Hashtype}:$(genkey 64 | pack_hash)"
 	iseq "${NAME#gcrypt::}" "$URL" || {
-		git config "remote.$NAME.url" "gcrypt::$URL#$urlid_"
+		git config "remote.$NAME.gcrypt-id" "$Repoid"
 		fix_config=1
 	}
-	echo_info "Repository URL is" "gcrypt::$URL#$urlid_"
+	echo_info "Repository ID is $Repoid"
 	Extension_list=$(xecho "extn comment")
-	isnull "$fix_config" || echo_info "(configuration for $NAME updated)"
+	#isnull "$fix_config" || echo_info "(configuration for $NAME updated)"
 }
 
 
@@ -365,7 +366,7 @@ read_config()
 
 ensure_connected()
 {
-	local manifest_= rcv_repoid= url_id=
+	local manifest_= rcv_repoid= r_name=
 
 	if isnonnull "$Did_find_repo"
 	then
@@ -374,24 +375,36 @@ ensure_connected()
 	Did_find_repo=no
 	read_config
 
+	iseq "${NAME#gcrypt::}" "$URL" || r_name=$NAME
+
 	# Fixup ssh:// -> rsync://
 	if isurl ssh "$URL"; then
 		URL="rsync://${URL#ssh://}"
 	fi
 
-	# split out Repo ID from URL
-	url_id=${URL##*"#"}
-	isnoteq "$url_id" "$URL" || {
-		url_id=${URL##*/"G."}
-		isnoteq "$url_id" "$URL" || return 0
-		URL=${URL%/"G.$url_id"}
+	# Find the URL fragment
+	Urlfrag=${URL##*"#"}
+	isnoteq "$Urlfrag" "$URL" || Urlfrag=
+	URL=${URL%"#$Urlfrag"}
+
+	# manifestfile -- sha224 hash if we can, else the default location
+	if isurl sftp "$URL" || islocalrepo "$URL" || isurl rsync "$URL"
+	then
+		# not for gitception
+	isnull "$Urlfrag" || Manifestfile=$(xecho_n "$Urlfrag" | gpg_hash SHA224)
+	fi
+
+	Repoid=
+	isnull "$r_name" || {
+		Repoid=$(git config "remote.$r_name.gcrypt-id" || :)
 	}
-	URL=${URL%"#$url_id"}
-	Repoid=$(xecho_n "$url_id" | pack_hash)
+
 
 	TmpManifest_Enc="$Localdir/tmp_manifest.$$"
-	GET "$URL" "$Repoid" "$TmpManifest_Enc" 2>/dev/null ||
-		echo_die "Repository not found: $url_id at $URL"
+	GET "$URL" "$Manifestfile" "$TmpManifest_Enc" 2>/dev/null || {
+		echo_info "Repository not found: $URL"
+		return 0
+	}
 
 	Did_find_repo=yes
 	echo_info "Decrypting manifest"
@@ -401,21 +414,50 @@ ensure_connected()
 	rm -f "$TmpManifest_Enc"
 
 	Branchlist=$(xecho "$manifest_" | xgrep -E '^[0-9a-f]{40} ')
-	Packlist=$(xecho "$manifest_" | xgrep "^$Packpfx")
-	Keeplist=$(xecho "$manifest_" | xgrep "^keep")
+	Packlist=$(xecho "$manifest_" | xgrep "^pack ")
+	Keeplist=$(xecho "$manifest_" | xgrep "^keep ")
 	Extension_list=$(xecho "$manifest_" | xgrep "^extn ")
 	rcv_repoid=$(xecho "$manifest_" | xgrep "^repo ")
-	iseq "$(repoidstr)" "$rcv_repoid" || echo_die "Repository id mismatch!"
+
+	rcv_repoid=${rcv_repoid#repo }
+	rcv_repoid=${rcv_repoid% *}
+	if isnull "$Repoid"
+	then
+		echo_info "Remote repo ID is $rcv_repoid"
+		Repoid=$rcv_repoid
+	elif isnoteq "$rcv_repoid" "$Repoid"
+	then
+		echo_info "WARNING:"
+		echo_info "WARNING: Remote repository ID has changed!"
+		echo_info "WARNING: to $rcv_repoid"
+		echo_info "WARNING:"
+		Repoid=$rcv_repoid
+	else
+		return 0
+	fi
+
+	isnull "$r_name" || {
+		git config "remote.$r_name.gcrypt-id" "$rcv_repoid"
+	}
 }
 
 fetch_decrypt_pack()
 {
-	local key_= rcv_id=
-	GET "$URL" "$1" "$TmpPack_Encrypted" &&
-	rcv_id=$(pack_hash < "$TmpPack_Encrypted") &&
-	iseq "$rcv_id" "$1" ||
-		echo_die "Packfile $1 does not match digest!"
-	key_=$(xecho "$Packlist" | grep "$1" | cut -f 3 -d ' ')
+	local key_= rcv_id= htype_= pack_= hfunc_=
+	splitcolon "${1#pack :}"
+	htype_=$prefix_
+	pack_=$suffix_
+
+	if isnoteq "$htype_" SHA256 && isnoteq "$htype_" SHA224 &&
+		isnoteq "$htype_" SHA384 && isnoteq "$htype_" SHA512
+	then
+		echo_die "Packline malformed: $1"
+	fi
+	GET "$URL" "$pack_" "$TmpPack_Encrypted" &&
+	rcv_id=$(gpg_hash "$htype_" < "$TmpPack_Encrypted") &&
+	iseq "$rcv_id" "$pack_" ||
+		echo_die "Packfile $pack_ does not match digest!"
+	key_=$(xecho "$Packlist" | grep "$pack_" | cut -f 3 -d ' ')
 	DECRYPT "$key_" < "$TmpPack_Encrypted"
 }
 
@@ -462,8 +504,8 @@ repack_if_needed()
 		then
 			continue
 		fi
-		pack_=${packline_#"$Packpfx"}
-		fetch_decrypt_pack "$pack_" |
+		pack_=${packline_#$Packpat}
+		fetch_decrypt_pack "$packline_" |
 		git index-pack -v --stdin "$Localdir/pack/${pack_}.pack" >/dev/null
 	done
 	key_=$(genkey "$Packkey_bytes")
@@ -483,8 +525,8 @@ repack_if_needed()
 	fi
 
 	pack_id=$(pack_hash < "$TmpPack_Encrypted")
-	Packlist=$(append "$Packlist" "$Packpfx$pack_id $key_")
-	Keeplist=$(append "$Keeplist" "$Keeppfx$pack_id 1")
+	Packlist=$(append "$Packlist" "pack :${Hashtype}:$pack_id $key_")
+	Keeplist=$(append "$Keeplist" "keep :${Hashtype}:$pack_id 1")
 	rm -r -f "$Localdir/pack"
 	did_repack=yes
 }
@@ -542,11 +584,10 @@ do_fetch()
 	xecho "$pneed_" | while read packline_
 	do
 		isnonnull "$packline_" || continue
-		pack_=${packline_#"$Packpfx"}
-		fetch_decrypt_pack "$pack_" |
+		fetch_decrypt_pack "$packline_" |
 			git index-pack -v --stdin >/dev/null
 		# add to local pack list
-		xecho "$Packpfx$pack_" >> "$Localdir/have_packs$GITCEPTION"
+		xecho "${packline_}" >> "$Localdir/have_packs$GITCEPTION"
 	done
 
 	rm -f "$TmpPack_Encrypted"
@@ -614,7 +655,7 @@ EOF
 
 		if isnoteq "$did_repack" yes
 		then
-			Packlist=$(append "$Packlist" "$Packpfx$pack_id $key_")
+		Packlist=$(append "$Packlist" "pack :${Hashtype}:$pack_id $key_")
 		fi
 		# else, repack rewrote Packlist
 
@@ -639,14 +680,14 @@ EOF
 	rm -f "$TmpObjlist"
 
 	# Upload manifest
-	PUT "$URL" "$Repoid" "$TmpManifest_Enc"
+	PUT "$URL" "$Manifestfile" "$TmpManifest_Enc"
 
 	# Delete packs
 	if isnonnull "$Packlist_delete"; then
 		REMOVE "$URL" "$(xecho "$Packlist_delete" | while read packline_
 		do
 			isnonnull "$packline_" || continue
-			pack_=${packline_#"$Packpfx"}
+			pack_=${packline_#$Packpat}
 			xecho "$pack_"
 		done)"
 	fi

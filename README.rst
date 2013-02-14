@@ -44,18 +44,15 @@ Quickstart
         git remote add cryptremote gcrypt::rsync://example.com:repo
         git push cryptremote master
         > gcrypt: Setting up new repository
-        > gcrypt: Repository URL is gcrypt::rsync://example.com:repo#KNBr0wKzct52
-        > gcrypt: (configuration for cryptremote updated)
+        > gcrypt: Repository ID is :SHA256:3a29d035adf234af7e[... ]
         > [ more lines .. ]
         > To gcrypt::[...]
         > * [new branch]      master -> master
 
-* Share the updated Repository URL with all participants.
-
-(The generated Repository URL is not secret, it only exists to ensure
-that two repositories signed by the same user can not be maliciously
-switched around. It incidentally allows multiple repositories to all
-share location.)
+(The generated Repository id is not secret, it only exists to ensure
+that two repositories signed by the same user can be distinguished.
+You will see a warning if the remote repository ID changes, which will
+only happen if the remote was re-created or switched out.)
 
 Design Goals
 ............
@@ -98,9 +95,11 @@ Examples
 How to use a git backend::
 
     # notice that the target repo must already exist and its
-    # `master` branch will be overwritten!
-    git remote add gitcrypt gcrypt::git@example.com:repo
+    # `next` branch will be overwritten!
+    git remote add gitcrypt gcrypt::git@example.com:repo#next
     git push gitcrypt HEAD
+
+The URL fragment (`#next` here) indicates which branch is used.
 
 Notes
 =====
@@ -112,20 +111,20 @@ Repository Format
 
     EncSign(X)   is sign+encrypt to a PGP key holder
     Encrypt(K,X) is symmetric encryption
-    Hash(X)      is SHA-224
+    Hash(X)      is SHA-256
 
     B: branch list
     L: list of the hash (Hi) and key (Ki) for each packfile
-    R: Hash(Repository ID)
+    R: repository id
     
-    Store Manifest as EncSign(B || L || R) in filename R
+    Store Manifest as EncSign(B || L || R)
     Store each packfile P as P' = Encrypt(Ki, P) in filename Hi
         where Hi = Hash(P') and Ki is a random string
 
     To read the repository
 
     decrypt+verify Manifest using private key -> (B, L, R)
-    verify R matches Hash(Requested Repository ID)
+    warn if R does not match saved repository id for this remote
     for Hi, Ki in L:
         download file Hi from the server -> P'
         verify Hash(P') matches Hi
@@ -138,14 +137,13 @@ Manifest file
 
 ::
 
-    $ gpg -d < 5a191cea8c1021a95d813c4007c14f2cc987a40880c2f669430f1916
-    b4a4a39365d19282810c19d0f3f24d04dd2d179f refs/tags/version1
-    1d323ddadf4cf1d80fced447e637ab3766b168b7 refs/heads/master
-    pack :SHA224:cfdf36515e0d0820554fe5fd9f00a4bee17bcf88ec8a752d851c46ee \
-    Rc+j8Nv6GOW3mBhWOx6W6jjz3BTX7B6XIJ6RYI+P4TEy
-    pack :SHA224:a43ccd208d3bd2ea582dbd5407cb8ed6e18b150b1da25c806115eaa5 \
-    UXR3/R7awFCUJWYdzXzrlkk7E2Acxq/Y4EfEcd62AwGG
-    repo :SHA224:5a191cea8c1021a95d813c4007c14f2cc987a40880c2f669430f1916 1
+    $ gpg -d 91bd0c092128cf2e60e1a608c31e92caf1f9c1595f83f2890ef17c0e4881aa0a
+    542051c7cd152644e4995bda63cc3ddffd635958 refs/heads/next
+    3c9e76484c7596eff70b21cbe58408b2774bedad refs/heads/master
+    pack :SHA256:f2ad50316fbca42c553810aec3709c24974585ec1b34aae77d5cd4ba67092dc4 z8YoAnFpMlWPIYG8wo1adewd4Fp7Fo3PkI2mND49P1qm
+    pack :SHA256:a6e17bb4c042bdfa8e38856ee6d058d0c0f0c575ace857c4795426492f379584 82+k2cbiUn7i2cW0dgXfyX6wXGpvVaQGj5sF59Y8my5W
+    keep :SHA256:f2ad50316fbca42c553810aec3709c24974585ec1b34aae77d5cd4ba67092dc4 1
+    repo :SHA256:ef8e52a7ea96761f713c14caa7190b5f3b55ff87ffe091cab40f7cbe1d3b5b96
 
 Each item extends until newline, and matches one of the following forms:
 
@@ -158,8 +156,8 @@ Each item extends until newline, and matches one of the following forms:
   `keep :<hashtype>:<hash> <generation>`
       Packfile hash and its repack generation
 
-  `repo :<hashtype>:<hash> <version>`
-      The hash of the repository id.
+  `repo :<hashtype>:<hash>`
+      The repository id
 
   `extn <name> ...`
       Extension field, preserved but unused.
@@ -168,7 +166,6 @@ Each item extends until newline, and matches one of the following forms:
 Yet to be Implemented
 .....................
 
-+ Repacking the remote repository
 + Some kind of simple keyring management
 
 See Also
