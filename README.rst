@@ -16,12 +16,13 @@ Remote helper programs are invoked by git to handle network transport.
 This helper handles gcrypt:: URLs that will access a remote repository
 encrypted with GPG, using our custom format.
 
-Supported locations are `local`, `ssh://` and `sftp://`, where the
-repository is stored as a set of files. If the location instead is any
-`<giturl>`, gcrypt will store the same representation in a git
-repository, and so it can be bridged over any git transport.
+Supported locations are `local`, `ssh://`, `rsync://` and `sftp`, where
+the repository is stored as a set of files, or instead any `<giturl>`
+where gcrypt will store the same representation in a git repository,
+bridged over arbitrary git transport.
 
-.. NOTE:: Repository format MAY STILL change, incompatibly
+.. NOTE:: Repository format MAY STILL change, incompatibly. We may
+          not continue to support all types of remote transport.
 
 Quickstart
 ..........

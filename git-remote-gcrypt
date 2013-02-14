@@ -121,46 +121,52 @@ gitception_new_repo()
 }
 ## end gitception
 
-# Fetch repo $1, file $2
+# Fetch repo $1, file $2, tmpfile in $3
 GET()
 {
 	if isurl ssh "$1"
 	then
 		splitcolon "${1#ssh://}"
-		(exec 0>&-; ssh "$prefix_" "cat $suffix_/$2")
+		(exec 0>&-; ssh "$prefix_" "cat $suffix_/$2") > "$3"
 	elif isurl sftp "$1"
 	then
-		(exec 0>&-; curl -s -S -k "$1/$2")
+		(exec 0>&-; curl -s -S -k "$1/$2") > "$3"
+	elif isurl rsync "$1"
+	then
+		(exec 0>&-; rsync -I -W "${1#rsync://}"/"$2" "$3" >&2)
 	elif islocalrepo "$1"
 	then
-		cat "$1/$2"
+		cat "$1/$2" > "$3"
 	else
-		gitception_get "${1#gitception://}" "$2"
+		gitception_get "${1#gitception://}" "$2" > "$3"
 	fi
 }
 
-# Put repo $1, file $2 or fail
+# Put repo $1, file $2 or fail, tmpfile in $3
 PUT()
 {
 	if isurl ssh "$1"
 	then
 		splitcolon "${1#ssh://}"
-		ssh "$prefix_" "cat > $suffix_/$2"
+		ssh "$prefix_" "cat > $suffix_/$2" < "$3"
 	elif isurl sftp "$1"
 	then
-		curl -s -S -k --ftp-create-dirs -T - "$1/$2"
+		curl -s -S -k --ftp-create-dirs -T "$3" "$1/$2"
+	elif isurl rsync "$1"
+	then
+		rsync -I -W "$3" "${1#rsync://}"/"$2" >&2
 	elif islocalrepo "$1"
 	then
-		cat > "$1/$2"
+		cat > "$1/$2" < "$3"
 	else
-		gitception_put "${1#gitception://}" "$2"
+		gitception_put "${1#gitception://}" "$2" < "$3"
 	fi
 }
 
 # Put all PUT changes for repo $1 at once
 PUT_FINAL()
 {
-	if isurl ssh "$1" || isurl sftp "$1" || islocalrepo "$1"
+	if isurl ssh "$1" || isurl sftp "$1" || islocalrepo "$1" || isurl rsync "$1"
 	then
 		:
 	else
@@ -178,6 +184,9 @@ PUTREPO()
 	elif isurl sftp "$1"
 	then
 		:
+	elif isurl rsync "$1"
+	then
+		rsync -q -r --exclude='*' "$Localdir/" "${1#rsync://}" >&2
 	elif islocalrepo "$1"
 	then
 		mkdir -p "$1"
@@ -188,7 +197,7 @@ PUTREPO()
 
 CLEAN_FINAL()
 {
-	if isurl ssh "$1" || isurl sftp "$1" || islocalrepo "$1"
+	if isurl ssh "$1" || isurl sftp "$1" || islocalrepo "$1" || isurl rsync "$1"
 	then
 		:
 	else
@@ -330,7 +339,7 @@ ensure_connected()
 
 	TmpManifest_Enc="$Localdir/manifest.$$"
 	trap 'rm -f "$TmpManifest_Enc"' EXIT
-	GET "$URL" "$Repoid" 2>/dev/null > "$TmpManifest_Enc" ||
+	GET "$URL" "$Repoid" "$TmpManifest_Enc" 2>/dev/null ||
 		echo_die "Repository not found: $url_id at $URL"
 
 	Did_find_repo=yes
@@ -413,8 +422,8 @@ do_fetch()
 	do
 		isnonnull "$packline_" || continue
 		pack_=${packline_#"$Packpfx"}
-		rcv_id="$(GET "$URL" "$pack_" | \
-			tee "$TmpPack_Encrypted" | pack_hash)"
+		GET "$URL" "$pack_" "$TmpPack_Encrypted"
+		rcv_id=$(pack_hash < "$TmpPack_Encrypted")
 		if isnoteq "$rcv_id" "$pack_"
 		then
 			echo_die "Packfile $pack_ does not match digest!"
@@ -490,7 +499,7 @@ EOF
 	then
 		pack_id=$(pack_hash < "$TmpPack_Encrypted")
 		Packlist=$(append "$Packlist" "$Packpfx$pack_id $key_")
-		PUT "$URL" "$pack_id" < "$TmpPack_Encrypted"
+		PUT "$URL" "$pack_id" "$TmpPack_Encrypted"
 	fi
 
 	rm -f "$TmpPack_Encrypted"
@@ -508,7 +517,7 @@ EOF
 	repoidstr; xecho "$Extension_list") |
 		PRIVENCRYPT "$Recipients" > "$TmpManifest_Enc"
 
-	PUT "$URL" "$Repoid" < "$TmpManifest_Enc"
+	PUT "$URL" "$Repoid" "$TmpManifest_Enc"
 
 	PUT_FINAL "$URL"
 
