@@ -389,11 +389,33 @@ ensure_connected()
 	# Fixup ssh:// -> rsync://
 	if isurl ssh "$URL"; then
 		URL="rsync://${URL#ssh://}"
+		isnull "$r_name" || {
+			git config "remote.$r_name.url" "gcrypt::$URL"
+			echo_info "Updated URL for $r_name, ssh: -> rsync:"
+		}
+	fi
+	if isurl gitception "$URL" && isnonnull "$r_name"; then
+		git config "remote.$r_name.url" "gcrypt::${URL#gitception://}"
+		echo_info "Updated URL for $r_name, gitception:// -> ()"
 	fi
 
 	# Find the URL fragment
 	Urlfrag=${URL##*"#"}
 	isnoteq "$Urlfrag" "$URL" || Urlfrag=
+	isnonnull "$Urlfrag" || {
+		# find old style  /G.XXXXXX fragment
+		Urlfrag=${URL##*/G.}
+		if isnoteq "$Urlfrag" "$URL"; then
+			URL=${URL%/G."$Urlfrag"}
+			isnull "$r_name" || {
+				git config "remote.$r_name.url" \
+					"gcrypt::$URL#$Urlfrag"
+				echo_info "Updated URL for $r_name, use #fragment"
+			}
+		else
+			Urlfrag=
+		fi
+	}
 	URL=${URL%"#$Urlfrag"}
 
 	# manifestfile -- sha224 hash if we can, else the default location
