@@ -114,30 +114,37 @@ Notes
 Repository Format
 .................
 
-::
+``EncSign(X)``
+    Sign and Encrypt to GPG key holder
+``Encrypt(K,X)``
+    Encrypt using symmetric-key algorithm
+``Hash(X)``
+    SHA-2/256
 
-    EncSign(X)   is sign+encrypt to a PGP key holder
-    Encrypt(K,X) is symmetric encryption
-    Hash(X)      is SHA-256
+``B``
+    branch list
+``L``
+    list of the hash (``Hi``) and key (``Ki``) for each packfile
+``R``
+    Repository ID
 
-    B: branch list
-    L: list of the hash (Hi) and key (Ki) for each packfile
-    R: Repository ID
-    
-    Store Manifest as EncSign(B || L || R)
-    Store each packfile P as P' = Encrypt(Ki, P) in filename Hi
-        where Hi = Hash(P') and Ki is a random string
-
-    To read the repository
-
-    decrypt+verify Manifest using private key -> (B, L, R)
-    warn if R does not match saved Repository ID for this remote
-    for Hi, Ki in L:
-        download file Hi from the server -> P'
-        verify Hash(P') matches Hi
-        decrypt P' using Ki -> P then open P with git
-
-    Only packs mentioned in L are downloaded.
+|
+| To write the repository:
+|
+| Store each packfile ``P`` as ``P'`` = ``Encrypt(Ki, P)`` in filename ``Hi``
+|   where ``Ki`` is a new random string and ``Hi = Hash(P')``
+| Store ``EncSign(B || L || R)`` in the manifest
+|
+| To read the repository:
+|
+| Decrypt and verify manifest using GPG keyring ``-> (B, L, R)``
+| Warn if ``R`` does not match saved Repository ID for this remote
+| ``for each Hi, Ki in L``:
+|   Get file ``Hi`` from the server ``-> P'``
+|   Verify ``Hash(P')`` matches ``Hi``
+|   Decrypt ``P'`` using ``Ki`` -> ``P`` then open ``P`` with git
+|
+| Only packs mentioned in ``L`` are downloaded.
 
 Manifest file
 .............
