@@ -5,7 +5,7 @@
 :License:       GPLv2 or any later version, see http://www.gnu.org/licenses/
 :Decscription:  Use GnuPG to use encrypted git remotes
 
-.. warning:: Repository format MAY STILL change, incompatibly
+.. NOTE:: Repository format MAY STILL change, incompatibly
 
 Introduction
 ------------
@@ -52,8 +52,8 @@ Configuration
     gpg --export KEYID1 > <path-to-keyring>
     git config gcrypt.keyring <path-to-keyring>
 
-+ NOTE: We use the user's gnupg configuration for `cipher-algo` and so on!
-        Check your keys and key preferences, see `man gpg`.
+  .. NOTE:: We use the user's gnupg configuration for `cipher-algo` and so on!
+            Check your keys and key preferences, see `man gpg`.
 
 + All readers of the repository must have their pubkey included in
   the keyring used when pushing. All writers must have the complete
