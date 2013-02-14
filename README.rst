@@ -58,11 +58,10 @@ share location.)
 Design Goals
 ............
 
-+ Confidential, authenticated git storage and collaboration on any
-  untrusted file host or service. The only information we (by necessity)
-  leak is the approximate size and timing of updates.  PLEASE help me
-  evaluate how well we meet this design goal!
-
+Confidential, authenticated git storage and collaboration on any
+untrusted file host or service. The only information we (by necessity)
+leak is the approximate size and timing of updates.  PLEASE help me
+evaluate how well we meet this design goal!
 
 Configuration
 =============
@@ -73,13 +72,13 @@ Configuration
 
 git-remote-gcrypt respects the variable *user.signingkey*.
 
-.. NOTE:: GPG configuration applies to public-key encryption, symmetric
-          encryption, and signing. See `man gpg`.
+The encryption of the manifest is updated for each push. The pusher must
+have the public keys of all collaborators in the keyring.  You can
+commit the keyring to the repo, further key management features do not
+yet exist.
 
-All readers of the repository must have their pubkey included in the
-keyring used when pushing. All writers must have the complete set of
-pubkeys available. You can commit the keyring to the repo, further key
-management features do not yet exist.
+GPG configuration applies to public-key encryption, symmetric
+encryption, and signing. See `man gpg` for more information.
 
 
 Examples
@@ -98,7 +97,7 @@ Notes
 Repository Format
 .................
 
-+ Protocol::
+::
 
     EncSign(X)   is sign+encrypt to a PGP key holder
     Encrypt(K,X) is symmetric encryption
