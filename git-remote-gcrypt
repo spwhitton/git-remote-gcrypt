@@ -16,7 +16,8 @@ genkey()
 
 pack_hash()
 {
-	gpg --print-md SHA224  | tr -d ' ' | tr A-F a-f
+	local HASH=$(gpg --with-colons --print-md SHA224 | tr A-F a-f)
+	HASH=${HASH#:*:}; printf "%s" "${HASH%:}"
 }
 
 LOCALDIR="${GIT_DIR:-.git}/remote-gcrypt"
