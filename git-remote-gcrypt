@@ -174,6 +174,11 @@ CLEARSIGN()
 	fi
 }
 
+CHECKSIGN()
+{
+	gpg -q --no-default-keyring --keyring "$CONF_KEYRING" -d
+}
+
 DECRYPT()
 {
 	(printf "%s" "$MASTERKEY" | \
@@ -199,6 +204,7 @@ make_new_repo()
 	# The MASTERKEY is encrypted to all RECIPIENTS. The key is a long
 	# ascii-encoded string used for symmetric encryption with GnuPG.
 	local RECIPIENTS
+	local KEYSIGN
 	echo_info "Setting up new repository at $URL"
 	RECIPIENTS="$(gpg --no-default-keyring --keyring "$CONF_KEYRING" \
 		--with-colons -k | xgrep ^pub | cut -f5 -d:)"
@@ -216,9 +222,36 @@ make_new_repo()
 	echo_info "Encrypting to \"$RECIPIENTS\""
 	echo_info "Generating new master key"
 	MASTERKEY="$(genkey)"
-	printf "%s" "$MASTERKEY" | \
-		gpg --compress-algo none -e $RECIPIENTS | PUT "$URL" masterkey
+	KEYSIGN=$(printf "%s\n" "$MASTERKEY" | gpg --output - --clearsign)
+	TMPMASTERKEY_ENC="$LOCALDIR/masterenc.$$"
+	trap 'rm -f "$TMPMASTERKEY_ENC"' EXIT
+	printf "%s" "$KEYSIGN" | gpg --no-default-keyring \
+		--keyring "$CONF_KEYRING" --compress-algo none -e $RECIPIENTS \
+		> "$TMPMASTERKEY_ENC"
+	PUT "$URL" masterkey < "$TMPMASTERKEY_ENC"
+	rm -f "$TMPMASTERKEY_ENC"
+	trap EXIT
 }
+
+get_masterkey()
+{
+	TMPMASTERKEY_ENC="$LOCALDIR/masterenc.$$"
+	trap 'rm -f "$TMPMASTERKEY_ENC"' EXIT
+	echo_info "Verifying masterkey signature"
+	GET "$URL" masterkey 2>/dev/null > "$TMPMASTERKEY_ENC" || return 0
+	#echo_info "Opening Master Key"
+	gpg -q -d < "$TMPMASTERKEY_ENC" | CHECKSIGN || {
+		echo_info "Opening of master key failed!"
+		echo_info "Using keyring $CONF_KEYRING"
+		if [ "$CONF_KEYRING" = "/dev/null" ] ; then
+		echo_info "Please configure gcrypt.keyring"
+		fi
+		exit 1
+	}
+	rm -f "$TMPMASTERKEY_ENC"
+	trap EXIT
+}
+
 
 read_config()
 {
@@ -250,8 +283,7 @@ ensure_connected()
 	then
 		# Use gpg to verify and strip the signature
 		echo_info "Verifying manifest signature"
-		STRIPDATA="$(printf "%s" "$MANIFESTDATA" | \
-		gpg -q --no-default-keyring --keyring "$CONF_KEYRING" -d || {
+		STRIPDATA="$(printf "%s" "$MANIFESTDATA" | CHECKSIGN || {
 			echo_info "WARNING: Failed to verify signature from $URL"
 			echo_info "WARNING: Using keyring $CONF_KEYRING"
 			if [ "$CONF_KEYRING" = "/dev/null" ] ; then
@@ -267,11 +299,6 @@ ensure_connected()
 	[ -n "$MANIFESTDATA" ] || exit 1
 	BRANCHLIST=$(printf "%s\n" "$MANIFESTDATA" | xgrep -E '^[0-9a-f]{40}')
 	PACKLIST=$(printf "%s\n" "$MANIFESTDATA" | xgrep "^$PACKPFX")
-}
-
-get_masterkey()
-{
-	GET "$URL" masterkey 2>/dev/null | gpg -q -d || :
 }
 
 do_capabilities()
