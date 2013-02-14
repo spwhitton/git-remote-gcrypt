@@ -102,6 +102,12 @@ Repository Format
     R7awFCUJWYdzXzrlkk7E2Acxq/Y4EfEcd62AwGGe0o0QxL+s5CwWI/NvMhb
     repo :SHA224:5a191cea8c1021a95d813c4007c14f2cc987a40880c2f669430f1916 1
 
++ Manifest fields:
+
+  + `<fieldname><space><value>`, extends until newline.
+  + `{0-9a-f}[40]`, `pack`, `repo`, `keep` (planned), `extn` (extension
+    fields, preserved but unused).
+
 
 Pieces yet to be Implemented
 ----------------------------

@@ -19,6 +19,7 @@ Hashpfx=":SHA224:"
 UrlTag="G."
 Packpfx="pack $Hashpfx"
 Packkey_bytes=33
+Extension_list=
 
 # compat/utility functions
 xecho()
@@ -285,6 +286,7 @@ make_new_repo()
 		fix_config=1
 	}
 	echo_info "Repository URL is" "gcrypt::$URL/$UrlTag$urlid_"
+	Extension_list=$(xecho "extn comment")
 	isnull "$fix_config" || echo_info "(configuration for $NAME updated)"
 }
 
@@ -335,6 +337,7 @@ ensure_connected()
 
 	Branchlist=$(xecho "$manifest_" | xgrep -E '^[0-9a-f]{40} ')
 	Packlist=$(xecho "$manifest_" | xgrep "^$Packpfx")
+	Extension_list=$(xecho "$manifest_" | xgrep "^extn ")
 	rcv_repoid=$(xecho "$manifest_" | xgrep "^repo ")
 	iseq "$(repoidstr)" "$rcv_repoid" || echo_die "Repository id mismatch!"
 }
@@ -484,7 +487,8 @@ EOF
 	TmpManifest_Enc="$Localdir/manifest.$$"
 	trap 'rm -f "$TmpManifest_Enc"' EXIT
 
-	(xecho "$Branchlist"; xecho "$Packlist"; repoidstr) |
+	(xecho "$Branchlist"; xecho "$Packlist";
+	repoidstr; xecho "$Extension_list") |
 		PRIVENCRYPT "$Recipients" > "$TmpManifest_Enc"
 
 	PUT "$URL" "$Repoid" < "$TmpManifest_Enc"
