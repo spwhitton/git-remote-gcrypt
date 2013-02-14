@@ -217,9 +217,10 @@ PRIVDECRYPT()
 	})
 }
 
+# Generate $1 random bytes
 genkey()
 {
-	gpg --armor --gen-rand 1 128 | tr -d \\n
+	gpg --armor --gen-rand 1 "$1"
 }
 
 pack_hash()
@@ -260,15 +261,15 @@ make_new_repo()
 	local urlid_= fix_config=
 	echo_info "Setting up new repository at $URL"
 	PUTREPO "$URL"
-	Masterkey="$(genkey)"
+	Masterkey="$(genkey 128)"
 
 	# We need a relatively short ID for URL+REPO
 	# The manifest will be stored at SHA224(urlid_)
 	# Needed assumption: the same user should have no duplicate urlid_
-	# For now, we use 20 random hex digits (80 bits), can be increased
-	urlid_=$(genkey | pack_hash | cut -c 1-20)
+	# For now, we arbitrarily use 9 random bytes (72 bits)
+	urlid_=$(genkey 9 | tr '/+' 'Zz')
 	Repoid=$(xecho_n "$urlid_" | pack_hash)
-	echo_info "Repository ID is" "$urlid_"
+	echo_info "Repository ID  is" "$urlid_"
 	isnoteq "${NAME#gcrypt::}" "$URL" && {
 		git config "remote.$NAME.url" "gcrypt::$URL/G/$urlid_"
 		fix_config=1
