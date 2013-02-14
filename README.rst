@@ -139,15 +139,29 @@ Manifest file
     b4a4a39365d19282810c19d0f3f24d04dd2d179f refs/tags/version1
     1d323ddadf4cf1d80fced447e637ab3766b168b7 refs/heads/master
     pack :SHA224:cfdf36515e0d0820554fe5fd9f00a4bee17bcf88ec8a752d851c46ee \
-    Rc+j8Nv6GOW3mBhWOx6W6jjz3BTX7B6XIJ6RYI+P4TEyy+X6p2PB/fsBL9la0Tuc
+    Rc+j8Nv6GOW3mBhWOx6W6jjz3BTX7B6XIJ6RYI+P4TEy
     pack :SHA224:a43ccd208d3bd2ea582dbd5407cb8ed6e18b150b1da25c806115eaa5 \
-    UXR3/R7awFCUJWYdzXzrlkk7E2Acxq/Y4EfEcd62AwGGe0o0QxL+s5CwWI/NvMhb
+    UXR3/R7awFCUJWYdzXzrlkk7E2Acxq/Y4EfEcd62AwGG
     repo :SHA224:5a191cea8c1021a95d813c4007c14f2cc987a40880c2f669430f1916 1
 
 + `field<space>value`, extends until newline.
 
-+ `field` is one of `[0-9a-f]{40}`, `pack`, `repo`, `keep` (planned),
-  `extn` (extension fields, preserved but unused).
++ `field` is one of `[0-9a-f]{40}`, `pack`, `repo`, `keep`, `extn`.
+
+  `[0-9a-f]{40} <gitref>`
+      SHA-1 and its git ref
+
+  `pack :<hashtype>:<hash> <key>`
+      Packfile hash (`Hi`) and corresponding symmetric key (`Ki`).
+
+  `repo :<hashtype>:<hash> <version>`
+      The hash of the repository id.
+
+  `extn ...`
+      Extension field, preserved but unused.
+
+  `keep ...`
+      TBD.
 
 
 Yet to be Implemented
