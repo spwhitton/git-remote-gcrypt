@@ -24,7 +24,7 @@ Example use::
     git push cryptremote master
     > gcrypt: Setting up new repository at ssh://example.com:repo
     > gcrypt: Repository ID  is KNBr0wKzct52
-    > gcrypt: Repository URL is gcrypt::ssh://example.com:repo/G/KNBr0wKzct52
+    > gcrypt: Repository URL is gcrypt::ssh://example.com:repo/G.KNBr0wKzct52
     > gcrypt: (configuration for cryptremote updated)
     > [ more lines .. ]
     > To gcrypt::[...]
@@ -70,37 +70,35 @@ Repository Format
     Encrypt(K,X) is symmetric encryption
     Hash(X)      is SHA-224
 
-    K: master key, generated once, 128 bytes
     B: branch list
-    L: list of packfile hashes
+    L: list of the hash (Hi) and key (Ki) for each packfile
     R: Hash(Repository ID)
     
-    Store Manifest as EncSign(K || B || L || R) in filename R
-    Each packfile P is stored as P' = Encrypt(K,P) in filename Hash(P')
-    L is the list of Hash(P').
+    Store Manifest as EncSign(B || L || R) in filename R
+    Store each packfile P as P' = Encrypt(Ki, P) in filename Hi
+        where Hi = Hash(P') and Ki is a random string
 
     To read the repository
 
-    decrypt+verify Manifest using private key -> (K, B, L, R)
+    decrypt+verify Manifest using private key -> (B, L, R)
     verify R matches Hash(Requested Repository ID)
-    for each entry in L:
-        get the entry from the server -> P'
-        verify  Hash(P') matches the entry in L
-        decrypt P' using K -> P -> open P with git
+    for Hi, Ki in L:
+        download file Hi from the server -> P'
+        verify Hash(P') matches Hi
+        decrypt P' using Ki -> P then open P with git
 
     Only packs mentioned in L are downloaded.
 
 + The manifest looks like this::
 
-    $ gpg -d < 9f42017de5cb482e509ff147d54ceeb0413d6379717f3f0db770f00a
-    T+pCUr/1FxbBC93ABIiIgG36EgqaxvgdNYjdmRSueGkgGETc4Qs7di+/yIsq2R5GysiqFaR0 \
-    bGSWf9omsoAH84hmED/kR/ZQiOGT/vg2Pg7CGI0xzdlW9GQjeFBAo4vsDDDBxrn5L7F9E532 \
-    LOnnPLSIZD7BpmyY/oZiXoP5Vlw=
-    b4a4a39365d19282810c19d0f3f24d04dd2d179f refs/tags/something
+    $ gpg -d < 5a191cea8c1021a95d813c4007c14f2cc987a40880c2f669430f1916
+    b4a4a39365d19282810c19d0f3f24d04dd2d179f refs/tags/version1
     1d323ddadf4cf1d80fced447e637ab3766b168b7 refs/heads/master
-    pack :SHA224:00ef27cc2c5b76365e1a46479ed7429e16572c543cdff0a8bf745c7c
-    pack :SHA224:b934d8d6c0f48e71b9d7a4d5ea56f024a9bed4f6f2c6f8e688695bee
-    repo 9f42017de5cb482e509ff147d54ceeb0413d6379717f3f0db770f00a
+    pack :SHA224:cfdf36515e0d0820554fe5fd9f00a4bee17bcf88ec8a752d851c46ee Rc+j8\
+    Nv6GOW3mBhWOx6W6jjz3BTX7B6XIJ6RYI+P4TEyy+X6p2PB/fsBL9la0Tuc
+    pack :SHA224:a43ccd208d3bd2ea582dbd5407cb8ed6e18b150b1da25c806115eaa5 UXR3/\
+    R7awFCUJWYdzXzrlkk7E2Acxq/Y4EfEcd62AwGGe0o0QxL+s5CwWI/NvMhb
+    repo :SHA224:5a191cea8c1021a95d813c4007c14f2cc987a40880c2f669430f1916 1
 
 
 Pieces yet to be Implemented

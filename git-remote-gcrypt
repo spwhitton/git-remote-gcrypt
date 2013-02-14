@@ -15,7 +15,10 @@ export GITCEPTION="$GITCEPTION+" # Reuse $Gref except when stacked
 Gref="refs/gcrypt/gitception$GITCEPTION"
 Gref_rbranch="refs/heads/master"
 Repoid=
-Packpfx="pack :SHA224:"
+Hashpfx=":SHA224:"
+UrlTag="G."
+Packpfx="pack $Hashpfx"
+Packkey_len=48  # bytes of pack key
 
 # compat/utility functions
 xecho()
@@ -53,6 +56,7 @@ splitcolon()
 	prefix_=${1%%:*}
 	suffix_=${1#*:}
 }
+repoidstr() { xecho "repo $Hashpfx$Repoid 1"; }
 
 ## gitception part
 # Fetch giturl $1, file $2
@@ -182,18 +186,16 @@ CLEAN_FINAL()
 
 ENCRYPT()
 {
-	gpg --batch --force-mdc --compress-algo none \
-		--passphrase-fd 3 -c  3<<EOF
-$Masterkey
+	gpg --batch --force-mdc --compress-algo none --passphrase-fd 3 -c 3<<EOF
+$1
 EOF
 }
 
 DECRYPT()
 {
 	gpg -q --batch --no-default-keyring --secret-keyring /dev/null \
-		--keyring /dev/null \
-		--passphrase-fd 3 -d  3<<EOF
-$Masterkey
+		--keyring /dev/null --passphrase-fd 3 -d  3<<EOF
+$1
 EOF
 }
 
@@ -260,7 +262,6 @@ make_new_repo()
 	local urlid_= fix_config=
 	echo_info "Setting up new repository at $URL"
 	PUTREPO "$URL"
-	Masterkey="$(genkey 128)"
 
 	# We need a relatively short ID for URL+REPO
 	# The manifest will be stored at SHA224(urlid_)
@@ -269,12 +270,12 @@ make_new_repo()
 	urlid_=$(genkey 9 | tr '/+' 'Zz')
 	Repoid=$(xecho_n "$urlid_" | pack_hash)
 	echo_info "Repository ID  is" "$urlid_"
-	isnoteq "${NAME#gcrypt::}" "$URL" && {
-		git config "remote.$NAME.url" "gcrypt::$URL/G/$urlid_"
+	iseq "${NAME#gcrypt::}" "$URL" || {
+		git config "remote.$NAME.url" "gcrypt::$URL/$UrlTag$urlid_"
 		fix_config=1
-	} || :
-	echo_info "Repository URL is" "gcrypt::$URL/G/$urlid_"
-	isnonnull "$fix_config" && echo_info "(configuration for $NAME updated)"||:
+	}
+	echo_info "Repository URL is" "gcrypt::$URL/$UrlTag$urlid_"
+	isnull "$fix_config" || echo_info "(configuration for $NAME updated)"
 }
 
 
@@ -295,10 +296,10 @@ ensure_connected()
 	read_config
 
 	# split out Repoid from URL
-	url_id=${URL##*/G/}
-	iseq "$url_id" "$URL" && url_id= && return 0 || :
+	url_id=${URL##*/"$UrlTag"}
+	isnoteq "$url_id" "$URL" || return 0
 
-	URL=${URL%/G/"$url_id"}
+	URL=${URL%/"$UrlTag$url_id"}
 	Repoid=$(xecho_n "$url_id" | pack_hash)
 
 	TmpManifest_Enc="$Localdir/manifest.$$"
@@ -321,12 +322,10 @@ ensure_connected()
 	rm -f "$TmpManifest_Enc"
 	trap - EXIT
 
-	Masterkey=$(xecho "$manifest_" | head -n 1)
 	Branchlist=$(xecho "$manifest_" | xgrep -E '^[0-9a-f]{40} ')
 	Packlist=$(xecho "$manifest_" | xgrep "^$Packpfx")
 	rcv_repoid=$(xecho "$manifest_" | xgrep "^repo ")
-	iseq "repo $Repoid" "$rcv_repoid" ||
-		echo_die "Repository id mismatch!"
+	iseq "$(repoidstr)" "$rcv_repoid" || echo_die "Repository id mismatch!"
 }
 
 do_capabilities()
@@ -343,7 +342,7 @@ do_list()
 
 	xecho "$Branchlist" | while read line_
 	do
-		isnull "$line_" && break || :
+		isnonnull "$line_" || break
 		obj_id=${line_%% *}
 		ref_name=${line_##* }
 		echo_git "$obj_id" "$ref_name"
@@ -363,7 +362,7 @@ do_fetch()
 	# The PACK id is the hash of the encrypted git packfile.
 	# We only download packs mentioned in the encrypted manifest,
 	# and check their digest when received.
-	local pack_= rcv_id= packline_= pneed_= pboth_= phave_=
+	local pack_= rcv_id= packline_= pneed_= pboth_= phave_= premote_= key_=
 
 	ensure_connected
 
@@ -376,15 +375,16 @@ do_fetch()
 	TmpPack_Encrypted="$Localdir/tmp_pack_ENCRYPTED_.$$"
 	trap 'rm -f "$TmpPack_Encrypted"' EXIT
 
+	premote_=$(xecho "$Packlist" | cut -f 1-2 -d ' ')
 	# Needed packs is  Packlist - (phave & Packlist)
 	# The `+` for $GITCEPTION is pointless but we will be safe for stacking
 	phave_="$(cat "$Localdir/have_packs+" 2>/dev/null || :)"
-	pboth_="$( (xecho "$Packlist"; xecho "$phave_") | sort_C | uniq -d)"
-	pneed_="$( (xecho "$Packlist"; xecho "$pboth_") | sort_C | uniq -u)"
+	pboth_="$( (xecho "$premote_"; xecho "$phave_") | sort_C | uniq -d)"
+	pneed_="$( (xecho "$premote_"; xecho "$pboth_") | sort_C | uniq -u)"
 
 	xecho "$pneed_" | while read packline_
 	do
-		isnull "$packline_" && continue || :
+		isnonnull "$packline_" || continue
 		pack_=${packline_#"$Packpfx"}
 		rcv_id="$(GET "$URL" "$pack_" | \
 			tee "$TmpPack_Encrypted" | pack_hash)"
@@ -392,7 +392,8 @@ do_fetch()
 		then
 			echo_die "Packfile $pack_ does not match digest!"
 		fi
-		DECRYPT < "$TmpPack_Encrypted" |
+		key_=$(xecho "$Packlist" | grep "$pack_" | cut -f 3 -d ' ')
+		DECRYPT "$key_" < "$TmpPack_Encrypted" |
 			git index-pack -v --stdin >/dev/null
 		# add to local pack list
 		xecho "$Packpfx$pack_" >> "$Localdir/have_packs$GITCEPTION"
@@ -410,7 +411,7 @@ do_push()
 	# Each git packfile is encrypted and then named for the encrypted
 	# file's hash. The manifest is updated with the pack id.
 	# The manifest is encrypted.
-	local remote_has= remote_want= prefix_= suffix_= line_= pack_id=
+	local remote_has= remote_want= prefix_= suffix_= line_= pack_id= key_=
 
 	ensure_connected
 	check_recipients
@@ -447,16 +448,17 @@ EOF
 
 	TmpPack_Encrypted="$Localdir/tmp_pack_ENCRYPTED_.$$"
 	TmpObjlist="$Localdir/tmp_packrevlist.$$"
+	key_=$(genkey "$Packkey_len")
 
 	append "$remote_has" "$remote_want" |
 		git rev-list --objects --stdin -- |
 		tee "$TmpObjlist" |
-		git pack-objects --stdout | ENCRYPT > "$TmpPack_Encrypted"
+		git pack-objects --stdout | ENCRYPT "$key_">"$TmpPack_Encrypted"
 	# Only send pack if we have any objects to send
 	if [ -s "$TmpObjlist" ]
 	then
 		pack_id=$(pack_hash < "$TmpPack_Encrypted")
-		Packlist=$(append "$Packlist" "$Packpfx$pack_id")
+		Packlist=$(append "$Packlist" "$Packpfx$pack_id $key_")
 		PUT "$URL" "$pack_id" < "$TmpPack_Encrypted"
 	fi
 
@@ -466,15 +468,12 @@ EOF
 
 	# Update manifest
 	echo_info "Encrypting manifest to \"$Recipients\""
-	echo_info "Requesting manifest key signature"
+	echo_info "Requesting manifest signature"
 
 	TmpManifest_Enc="$Localdir/manifest.$$"
 	trap 'rm -f "$TmpManifest_Enc"' EXIT
 
-	(xecho "$Masterkey"
-	xecho "$Branchlist"
-	xecho "$Packlist"
-	xecho "repo $Repoid") |
+	(xecho "$Branchlist"; xecho "$Packlist"; repoidstr) |
 		PRIVENCRYPT "$Recipients" > "$TmpManifest_Enc"
 
 	PUT "$URL" "$Repoid" < "$TmpManifest_Enc"
