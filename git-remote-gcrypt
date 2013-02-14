@@ -1,0 +1,343 @@
+#!/bin/sh
+
+# git-remote-gcrypt
+# Copyright 2013  by Ulrik
+# License: GPLv2 or any later version, see http://www.gnu.org/licenses/
+#
+# Requires GnuPG
+#
+# We read git config gcrypt.recipients when creating new repositories
+
+#set -x
+set -e
+LANG=C
+
+genkey()
+{
+	gpg --armor --gen-rand 1 128 | tr -d \\n
+}
+
+sha1()
+{
+	gpg --print-md sha1  | tr -d ' ' | tr A-F a-f
+}
+
+LOCALDIR="${GIT_DIR:-.git}/remote-gcrypt"
+DUMMYKEY="00000000000000000000"
+
+isurl() { test -z ${2%%"$1"://*} ; }
+
+# Split $1 into $prefix_:$suffix_
+splitcolon()
+{
+	prefix_=${1%%:*}
+	suffix_=${1#*:}
+}
+
+# Fetch repo $1, file $2
+GET()
+{
+	if isurl ssh "$1"
+	then
+		splitcolon ${1#ssh://}
+		(exec 0>&-; ssh "$prefix_" "cat $suffix_/$2")
+	elif isurl sftp "$1"
+	then
+		(exec 0>&-; curl -s -S -k "$1/$2")
+	else
+		cat "$1/$2"
+	fi
+}
+
+# Fetch repo $1, file $2 or return encrypted empty message
+GET_OR_EMPTY() { GET "$@" 2>/dev/null || (printf "" | ENCRYPT) ; }
+
+# Put repo $1, file $2 or fail
+PUT()
+{
+	if isurl ssh "$1"
+	then
+		splitcolon ${1#ssh://}
+		ssh "$prefix_" "cat > $suffix_/$2"
+	elif isurl sftp "$1"
+	then
+		curl -s -S -k --ftp-create-dirs -T - "$1/$2"
+	else
+		cat > "$1/$2"
+	fi
+}
+
+# Put directory for repo $1
+PUTREPO()
+{
+	if isurl ssh "$1"
+	then
+		splitcolon ${1#ssh://}
+		(exec 0>&- ; ssh "$prefix_" "mkdir -p $suffix_")
+	elif isurl sftp "$1"
+	then
+		:
+	else
+		mkdir -p "$1"
+	fi
+}
+
+ENCRYPT()
+{
+	(printf "%s" "$MASTERKEY" | \
+		gpg --batch --force-mdc --cipher-algo AES \
+			--passphrase-fd 0 --output - -c /dev/fd/3) 3<&0
+}
+
+DECRYPT()
+{
+	(printf "%s" "$MASTERKEY" | \
+		gpg -q --batch --passphrase-fd 0 --output - -d /dev/fd/3) 3<&0
+}
+
+tac() { sed '1!G;h;$!d'; }
+echo_info() { echo "$@" >&2; }
+
+make_new_repo()
+{
+	# Security protocol
+	# The MASTERKEY is encrypted to all RECIPIENTS
+	local RECIPIENTS
+	echo_info "Setting up new repository at $URL"
+	RECIPIENTS=$(git config gcrypt.recipients | sed -e 's/\([^ ]\+\)/-R &/g')
+	if [ -z "$RECIPIENTS" ]
+	then
+		echo_info "> You must configure which GnuPG recipients can access the repository."
+		echo_info "> To setup for all your git repositories, use::"
+		echo_info ">   git config --global gcrypt.recipients KEYID"
+		exit 1
+	fi
+	PUTREPO "$URL"
+	# Use an ascii key for GnuPG (due to its input limitations)
+	echo_info "Generating new master key"
+	MASTERKEY="$(genkey)"
+	printf "%s" "$MASTERKEY" | gpg -e $RECIPIENTS | PUT "$URL" masterkey
+}
+
+get_masterkey()
+{
+	(GET "$URL" masterkey 2>/dev/null || : ) | \
+	       (gpg -q --batch -d || printf "%s" "$DUMMYKEY")
+}
+
+do_capabilities()
+{
+	echo fetch
+	echo push
+	echo
+}
+
+do_list()
+{
+	local OBJID
+	local REFNAME
+	printf "%s\n" "$MANIFESTDATA" | while read LINE
+	do
+		OBJID=${LINE%% *}
+		REFNAME=${LINE##* }
+		echo "$OBJID" "$REFNAME"
+		if [ "$REFNAME" = "refs/heads/master" ]
+		then
+			echo "@refs/heads/master HEAD"
+		fi
+	done
+
+	# end with blank line
+	echo
+}
+
+do_fetch()
+{
+	# Security protocol:
+	# The PACK id is the sha-1 of the encrypted git packfile.
+	# We only download packs mentioned in the encrypted 'packfest',
+	# and check their digest when received.
+	local PNEED
+	local PREMOTE
+	local PBOTH
+	local PHAVE
+	touch "$LOCALDIR/packfest"
+	PREMOTE="$(GET_OR_EMPTY "$URL" packfest | DECRYPT)"
+	if [ -z "$PREMOTE" ]
+	then
+		echo # end with blank line
+		exit 0
+	fi
+
+	TMPPACK_ENCRYPTED="$LOCALDIR/tmp_pack_ENCRYPTED_.$$"
+	trap 'rm -f "$TMPPACK_ENCRYPTED"' EXIT
+
+	# Needed packs is  REMOTE - (HAVE & REMOTE)
+	PHAVE="$(cat "$LOCALDIR/packfest")"
+	PBOTH="$(printf "%s\n%s" "$PREMOTE" "$PHAVE" | sort | uniq -d)"
+	PNEED="$(printf "%s\n%s" "$PREMOTE" "$PBOTH" | sort | uniq -u)"
+
+	printf "%s\n" "$PNEED" | while read PACK
+	do
+		RCVID="$(GET "$URL" "$PACK" | tee "$TMPPACK_ENCRYPTED" | sha1)"
+		if [ "$RCVID" != "$PACK" ]
+		then
+			echo_info "Packfile $PACK does not match digest!"
+			exit 1
+		fi
+		cat "$TMPPACK_ENCRYPTED" | DECRYPT | git unpack-objects
+
+		# add to local pack list
+		printf "%s\n" "$PACK" >> "$LOCALDIR/packfest"
+	done
+
+	rm -f "$TMPPACK_ENCRYPTED"
+	trap EXIT
+	echo # end with blank line
+}
+
+# do_push PUSHARGS  (multiple lines)
+do_push()
+{
+	# each line is (with optional `+` and src)
+	# +src:dst
+	local REMOTEHAS
+	local REMOTEWANT
+	local PACKFEST
+	local prefix_
+	local suffix_
+
+	if [ "$MASTERKEY" = "$DUMMYKEY" ]
+	then
+		make_new_repo
+	fi
+
+	trap 'rm -f "$TMPMANIFEST" "$TMPPACK_ENCRYPTED" "$TMPOBJLIST"' EXIT
+	TMPMANIFEST="$LOCALDIR/tmp_new_manifest_.$$"
+	touch "$TMPMANIFEST"
+	if [ ! -z "$MANIFESTDATA" ]
+	then
+		printf "%s\n" "$MANIFESTDATA" > "$TMPMANIFEST"
+		REMOTEHAS="$(printf "%s" "$MANIFESTDATA" | \
+			     cut -f1 -d' ' | sed -e s/^/^/ | tr '\n' ' ')"
+	fi
+
+	REMOTEWANT="$(printf "%s\n" "$1" | while read LINE
+	do
+		# +src:dst -- remove leading + then split at :
+		splitcolon ${LINE#+}
+		if [ ! -z "$prefix_" ]
+		then
+			printf "%s " "$prefix_"
+			printf "%s %s\n" $(git rev-parse "$prefix_") "$suffix_" >> "$TMPMANIFEST"
+		# else delete
+		fi
+	done)"
+
+	# POSIX compat issue: sort -s (stable), but supported in bsd and gnu
+	MANIFESTDATA="$(cat "$TMPMANIFEST" | sort -k2 -s | tac | uniq -s40)"
+
+	TMPPACK_ENCRYPTED="$LOCALDIR/tmp_pack_ENCRYPTED_.$$"
+	TMPOBJLIST="$LOCALDIR/tmp_packrevlist.$$"
+	git rev-list --objects $REMOTEHAS $REMOTEWANT -- | \
+		tee "$TMPOBJLIST" | \
+		git pack-objects --stdout | ENCRYPT > "$TMPPACK_ENCRYPTED"
+	# Only send pack if we have any objects to send
+	if [ -s "$TMPOBJLIST" ]
+	then
+		PACKID=$(cat "$TMPPACK_ENCRYPTED" | sha1)
+		PACKFEST="$(GET_OR_EMPTY "$URL" packfest | DECRYPT)"
+		if [ -z "$PACKFEST" ]
+		then
+			PACKFEST="$(printf "%s\n" "$PACKID")"
+		else
+			PACKFEST="$(printf "%s\n%s\n" "$PACKFEST" "$PACKID")"
+		fi
+
+		cat "$TMPPACK_ENCRYPTED" | PUT "$URL" "$PACKID"
+		printf "%s\n" "$PACKFEST" | ENCRYPT | PUT "$URL" "packfest"
+	fi
+
+	printf "%s\n" "$MANIFESTDATA" | ENCRYPT | PUT "$URL" "manifest"
+
+	# ok all updates (not deletes)
+	printf "%s\n" "$1" | while read LINE
+	do
+		# +src:dst -- remove leading + then split at :
+		splitcolon ${LINE#+}
+		if [ -z "$prefix_" ]
+		then
+			echo "error $suffix_ delete not supported yet"
+		else
+			echo "ok $suffix_"
+		fi
+	done
+	
+	rm -f "$TMPPACK_ENCRYPTED"
+	rm -f "$TMPMANIFEST"
+	rm -f "$TMPOBJLIST"
+	trap EXIT
+	echo 
+}
+
+# Main program, check $URL is supported
+NAME=$1
+URL=$2
+( isurl ssh "$URL" || isurl sftp "$URL" || test -z ${URL##/*} ) || \
+	{ echo_info "Supported URLs: Absolute path, sftp://, ssh://" ; exit 1 ; }
+
+mkdir -p "$LOCALDIR"
+MASTERKEY="$(get_masterkey)"
+MANIFESTDATA="$(GET_OR_EMPTY "$URL" manifest | DECRYPT)"
+
+while read INPUT
+do
+	#echo_info "Got: $INPUT"
+	case "$INPUT" in
+	capabilities)
+		do_capabilities
+		;;
+	list|list\ for-push)
+		do_list
+		;;
+	fetch\ *)
+		FETCH_ARGS="${INPUT##fetch }"
+		while read INPUTX
+		do
+			case "$INPUTX" in
+			fetch*)
+			FETCH_ARGS= #ignored
+			;;
+			*)
+			break
+			;;
+			esac
+		done
+		do_fetch "$FETCH_ARGS"
+		;;
+	push\ *)
+		PUSH_ARGS="${INPUT##push }"
+		while read INPUTX
+		do
+			#echo_info "Got: (for push) $INPUTX"
+			case "$INPUTX" in
+			push\ *)
+			PUSH_ARGS="$(printf "%s\n%s" "$PUSH_ARGS" "${INPUTX#push }")"
+			;;
+			*)
+			break
+			;;
+			esac
+		done
+		do_push "$PUSH_ARGS"
+		;;
+	?*)
+		echo_info "Unknown input!"
+		exit 1
+		;;
+	*)
+		#echo_info "Blank line, we are done"
+		exit 0
+		;;
+	esac
+done
