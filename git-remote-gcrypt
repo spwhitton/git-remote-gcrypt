@@ -15,13 +15,14 @@ genkey()
 	gpg --armor --gen-rand 1 128 | tr -d \\n
 }
 
-sha1()
+pack_hash()
 {
-	gpg --print-md sha1  | tr -d ' ' | tr A-F a-f
+	gpg --print-md SHA224  | tr -d ' ' | tr A-F a-f
 }
 
 LOCALDIR="${GIT_DIR:-.git}/remote-gcrypt"
 DID_FIND_REPO=  # yes for connected, no for no repo
+PACKPFX="pack :SHA224:"
 
 isurl() { test -z "${2%%$1://*}" ; }
 
@@ -179,7 +180,7 @@ ensure_connected()
 		[ -n "$STRIPDATA" ] && MANIFESTDATA=$STRIPDATA
 	fi
 	BRANCHLIST=$(printf "%s\n" "$MANIFESTDATA" | (grep -E '^[0-9a-f]{40}' || :))
-	PACKLIST=$(printf "%s\n" "$MANIFESTDATA" | (grep '^pack ' || :))
+	PACKLIST=$(printf "%s\n" "$MANIFESTDATA" | (grep "^$PACKPFX" || :))
 }
 
 get_masterkey()
@@ -243,8 +244,8 @@ do_fetch()
 
 	printf "%s\n" "$PNEED" | while read PACKLINE
 	do
-		PACK=${PACKLINE#pack }
-		RCVID="$(GET "$URL" "$PACK" | tee "$TMPPACK_ENCRYPTED" | sha1)"
+		PACK=${PACKLINE#"$PACKPFX"}
+		RCVID="$(GET "$URL" "$PACK" | tee "$TMPPACK_ENCRYPTED" | pack_hash)"
 		if [ "$RCVID" != "$PACK" ]
 		then
 			echo_info "Packfile $PACK does not match digest!"
@@ -253,7 +254,7 @@ do_fetch()
 		DECRYPT < "$TMPPACK_ENCRYPTED" | git unpack-objects
 
 		# add to local pack list
-		printf "pack %s\n" "$PACK" >> "$LOCALDIR/have_packs"
+		printf "$PACKPFX%s\n" "$PACK" >> "$LOCALDIR/have_packs"
 	done
 
 	rm -f "$TMPPACK_ENCRYPTED"
@@ -266,7 +267,7 @@ do_push()
 {
 	# Security protocol:
 	# Each git packfile is encrypted and then named for the encrypted
-	# file's SHA-1. The manifest is updated with the pack id.
+	# file's hash. The manifest is updated with the pack id.
 	# The manifest is encrypted.
 	local REMOTEHAS
 	local REMOTEWANT
@@ -312,8 +313,8 @@ do_push()
 	# Only send pack if we have any objects to send
 	if [ -s "$TMPOBJLIST" ]
 	then
-		PACKID=$(sha1 < "$TMPPACK_ENCRYPTED")
-		PACKLIST=$(append "$PACKLIST" "pack $PACKID")
+		PACKID=$(pack_hash < "$TMPPACK_ENCRYPTED")
+		PACKLIST=$(append "$PACKLIST" "$PACKPFX$PACKID")
 		PUT "$URL" "$PACKID" < "$TMPPACK_ENCRYPTED"
 	fi
 
