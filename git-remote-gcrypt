@@ -458,7 +458,7 @@ do_push()
 		make_new_repo
 	fi
 
-	trap 'rm -f "$TmpPack_Encrypted" "$TmpObjlist"' EXIT
+	trap 'rm -f "$TmpPack_Encrypted" "$TmpObjlist" "$TmpManifest_Enc"' EXIT
 	if isnonnull "$Branchlist"
 	then
 		# filter through batch-check to mark only the commits we have
@@ -499,24 +499,27 @@ EOF
 	then
 		pack_id=$(pack_hash < "$TmpPack_Encrypted")
 		Packlist=$(append "$Packlist" "$Packpfx$pack_id $key_")
-		PUT "$URL" "$pack_id" "$TmpPack_Encrypted"
 	fi
 
-	rm -f "$TmpPack_Encrypted"
-	rm -f "$TmpObjlist"
-	trap - EXIT
-
-	# Update manifest
+	# Generate manifest
 	echo_info "Encrypting manifest to \"$Recipients\""
 	echo_info "Requesting manifest signature"
 
 	TmpManifest_Enc="$Localdir/manifest.$$"
-	trap 'rm -f "$TmpManifest_Enc"' EXIT
 
 	(xecho "$Branchlist"; xecho "$Packlist";
 	repoidstr; xecho "$Extension_list") |
 		PRIVENCRYPT "$Recipients" > "$TmpManifest_Enc"
 
+	# Upload pack
+	if [ -s "$TmpObjlist" ]
+	then
+		PUT "$URL" "$pack_id" "$TmpPack_Encrypted"
+	fi
+	rm -f "$TmpPack_Encrypted"
+	rm -f "$TmpObjlist"
+
+	# Upload manifest
 	PUT "$URL" "$Repoid" "$TmpManifest_Enc"
 
 	PUT_FINAL "$URL"
