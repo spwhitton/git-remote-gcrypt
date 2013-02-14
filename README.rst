@@ -52,8 +52,8 @@ Configuration
     gpg --export KEYID1 > <path-to-keyring>
     git config gcrypt.keyring <path-to-keyring>
 
-  .. NOTE:: We use the user's gnupg configuration for `cipher-algo` and so on!
-            Check your keys and key preferences, see `man gpg`.
+  .. NOTE:: The user's gnupg configuration for encryption algorithms are used.
+            Check your keys and preferences, see `man gpg`.
 
 + All readers of the repository must have their pubkey included in
   the keyring used when pushing. All writers must have the complete
@@ -92,15 +92,22 @@ Repository Format
 
 + The manifest looks like this::
 
-     $ gpg -d < 9f42017de5cb482e509ff147d54ceeb0413d6379717f3f0db770f00a
-     T+pCUr/1FxbBC93ABIiIgG36EgqaxvgdNYjdmRSueGkgGETc4Qs7di+/yIsq2R5GysiqFaR0 \
-     bGSWf9omsoAH84hmED/kR/ZQiOGT/vg2Pg7CGI0xzdlW9GQjeFBAo4vsDDDBxrn5L7F9E532 \
-     LOnnPLSIZD7BpmyY/oZiXoP5Vlw=
-     b4a4a39365d19282810c19d0f3f24d04dd2d179f refs/tags/something
-     1d323ddadf4cf1d80fced447e637ab3766b168b7 refs/heads/master
-     pack :SHA224:00ef27cc2c5b76365e1a46479ed7429e16572c543cdff0a8bf745c7c
-     pack :SHA224:b934d8d6c0f48e71b9d7a4d5ea56f024a9bed4f6f2c6f8e688695bee
-     repo 9f42017de5cb482e509ff147d54ceeb0413d6379717f3f0db770f00a
+    $ gpg -d < 9f42017de5cb482e509ff147d54ceeb0413d6379717f3f0db770f00a
+    T+pCUr/1FxbBC93ABIiIgG36EgqaxvgdNYjdmRSueGkgGETc4Qs7di+/yIsq2R5GysiqFaR0 \
+    bGSWf9omsoAH84hmED/kR/ZQiOGT/vg2Pg7CGI0xzdlW9GQjeFBAo4vsDDDBxrn5L7F9E532 \
+    LOnnPLSIZD7BpmyY/oZiXoP5Vlw=
+    b4a4a39365d19282810c19d0f3f24d04dd2d179f refs/tags/something
+    1d323ddadf4cf1d80fced447e637ab3766b168b7 refs/heads/master
+    pack :SHA224:00ef27cc2c5b76365e1a46479ed7429e16572c543cdff0a8bf745c7c
+    pack :SHA224:b934d8d6c0f48e71b9d7a4d5ea56f024a9bed4f6f2c6f8e688695bee
+    repo 9f42017de5cb482e509ff147d54ceeb0413d6379717f3f0db770f00a
 
+
+Pieces yet to be Implemented
+----------------------------
+
++ Repacking the remote repository
++ Deleting remote refs
++ Some kind of simple keyring management
 
 .. vim: ft=rst tw=74
