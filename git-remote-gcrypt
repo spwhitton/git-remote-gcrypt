@@ -44,6 +44,7 @@ xecho_n() { xecho "$@" | tr -d \\n ; } # kill newlines
 echo_git() { xecho "$@" ; }  # Code clarity
 echo_info() { xecho "gcrypt:" "$@" >&2; }
 echo_die() { echo_info "$@" ; exit 1; }
+echo_kill() { echo_info "$@" ; kill $$; exit 1; }
 
 isnull() { case "$1" in "") return 0;; *) return 1;; esac; }
 isnonnull() { ! isnull "$1"; }
@@ -612,7 +613,8 @@ EOF
 
 	xecho "$r_del_list" | get_pack_files "$Localdir/pack/"
 
-	(set +f; git verify-pack -v "$Localdir"/pack/*.idx) |
+	(set +f; git verify-pack -v "$Localdir"/pack/*.idx ||
+	 echo_kill "git verify-pack failed!") |
 		grep -E '^[0-9a-f]{40}' | cut -f 1 -d ' ' >> "$1"
 
 	Packlist=$r_keep_packlist
@@ -717,8 +719,9 @@ EOF
 		repack_if_needed "$tmp_objlist" @r_pack_delete
 
 		key_=$(genkey "$Packkey_bytes")
-		GIT_ALTERNATE_OBJECT_DIRECTORIES=$Localdir \
-			git pack-objects --stdout < "$tmp_objlist" |
+		(GIT_ALTERNATE_OBJECT_DIRECTORIES=$Localdir \
+			git pack-objects --stdout < "$tmp_objlist" ||
+			echo_kill "git pack-objects failed!") |
 			ENCRYPT "$key_" > "$tmp_encrypted"
 		pack_id=$(gpg_hash "$Hashtype" < "$tmp_encrypted")
 
