@@ -10,6 +10,7 @@
 
 set -e
 set -u
+set -f
 
 Localdir="${GIT_DIR:=.git}/remote-gcrypt"
 export GITCEPTION="${GITCEPTION:-}+" # Reuse $Gref except when stacked
@@ -611,8 +612,8 @@ EOF
 
 	xecho "$r_del_list" | get_pack_files "$Localdir/pack/"
 
-	git verify-pack -v "$Localdir"/pack/*.idx | grep -E '^[0-9a-f]{40}' |
-		cut -f 1 -d ' ' >> "$1"
+	(set +f; git verify-pack -v "$Localdir"/pack/*.idx) |
+		grep -E '^[0-9a-f]{40}' | cut -f 1 -d ' ' >> "$1"
 
 	Packlist=$r_keep_packlist
 	setvar "$2" "$r_del_list"
@@ -781,6 +782,7 @@ EOF
 
 cleanup_atexit()
 {
+	set +f
 	rm -f "$Localdir"/tmp_*".$$" >&2
 }
 
