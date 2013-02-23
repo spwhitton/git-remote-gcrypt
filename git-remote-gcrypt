@@ -288,16 +288,6 @@ CLEAN_FINAL()
 	fi
 }
 
-addsignkeyparam()
-{
-	if isnull "$Conf_signkey"; then
-		"$@"
-	else
-		"$@" -u "$Conf_signkey"
-	fi
-}
-
-
 ENCRYPT()
 {
 	gpg --batch --force-mdc --compress-algo none --passphrase-fd 3 -c 3<<EOF
@@ -316,7 +306,11 @@ EOF
 # Encrypt to recipients $1
 PRIVENCRYPT()
 {
-	addsignkeyparam gpg --compress-algo none -se $1
+	set -- $1
+	if isnonnull "$Conf_signkey"; then
+		set -- "$@" -u "$Conf_signkey"
+	fi
+	gpg --compress-algo none -se "$@"
 }
 
 # $1 is the match for good signature, $2 is the textual signers list
