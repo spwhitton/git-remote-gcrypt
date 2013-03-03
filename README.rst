@@ -180,9 +180,8 @@ git-remote-helpers(1), gpg(1)
 License
 =======
 
-git-remote-gcrypt is licensed under the terms of the GNU GPL version 3
-(or at your option, version 2, or any version later than GPLv3).
-See http://www.gnu.org/licenses/ for more information.
+This document and git-remote-gcrypt are licensed under identical terms,
+GPL-3 (or 2+), see the git-remote-gcrypt file.
 
 .. this document generates a man page with rst2man
 .. vim: ft=rst tw=72 sts=4
