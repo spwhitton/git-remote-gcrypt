@@ -450,14 +450,6 @@ ensure_connected()
 
 	iseq "${NAME#gcrypt::}" "$URL" || r_name=$NAME
 
-	# Fixup ssh:// -> rsync://
-	if isurl ssh "$URL"; then
-		URL="rsync://${URL#ssh://}"
-		isnull "$r_name" || {
-			git config "remote.$r_name.url" "gcrypt::$URL"
-			echo_info "Updated URL for $r_name, ssh: -> rsync:"
-		}
-	fi
 	if isurl gitception "$URL" && isnonnull "$r_name"; then
 		git config "remote.$r_name.url" "gcrypt::${URL#gitception://}"
 		echo_info "Updated URL for $r_name, gitception:// -> ()"
