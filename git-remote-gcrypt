@@ -458,20 +458,6 @@ ensure_connected()
 	# Find the URL fragment
 	url_frag=${URL##*"#"}
 	isnoteq "$url_frag" "$URL" || url_frag=
-	isnonnull "$url_frag" || {
-		# find old style  /G.XXXXXX fragment
-		url_frag=${URL##*/G.}
-		if isnoteq "$url_frag" "$URL"; then
-			URL=${URL%/G."$url_frag"}
-			isnull "$r_name" || {
-				git config "remote.$r_name.url" \
-					"gcrypt::$URL#$url_frag"
-				echo_info "Updated URL for $r_name, use #fragment"
-			}
-		else
-			url_frag=
-		fi
-	}
 	URL=${URL%"#$url_frag"}
 
 	# manifestfile -- sha224 hash if we can, else the default location
