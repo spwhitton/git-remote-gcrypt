@@ -60,13 +60,18 @@ xecho_n() { xecho "$@" | tr -d \\n ; } # kill newlines
 echo_git() { xecho "$@" ; }  # Code clarity
 echo_info() { xecho "gcrypt:" "$@" >&2; }
 echo_die() { echo_info "$@" ; exit 1; }
-echo_kill() { echo_info "$@" ; kill $$; exit 1; }
 
 isnull() { case "$1" in "") return 0;; *) return 1;; esac; }
 isnonnull() { ! isnull "$1"; }
 iseq() { case "$1" in "$2") return 0;; *) return 1;; esac; }
 isnoteq() { ! iseq "$1" "$2"; }
 negate() { ! "$@"; }
+
+# Execute $@ or die
+pipefail()
+{
+	"$@" || { echo_info "'$1' failed!"; kill $$; exit 1; }
+}
 
 isurl() { isnull "${2%%$1://*}"; }
 islocalrepo() { isnull "${1##/*}" && [ ! -e "$1/HEAD" ]; }
@@ -628,8 +633,7 @@ EOF
 
 	xfeed "$r_del_list" get_pack_files "$Tempdir/pack/"
 
-	(set +f; git verify-pack -v "$Tempdir"/pack/*.idx ||
-	 echo_kill "git verify-pack failed!") |
+	(set +f; pipefail git verify-pack -v "$Tempdir"/pack/*.idx) |
 		grep -E '^[0-9a-f]{40}' | cut -f 1 -d ' '
 
 	Packlist=$r_keep_packlist
@@ -736,15 +740,10 @@ EOF
 	if [ -s "$tmp_objlist" ]
 	then
 		key_=$(genkey "$Packkey_bytes")
-		pack_id=$(\
-			{
-				GIT_ALTERNATE_OBJECT_DIRECTORIES=$Tempdir \
-				git pack-objects --stdout < "$tmp_objlist" ||
-				echo_kill "git pack-objects failed!"
-			} | {
-				ENCRYPT "$key_" ||
-				echo_kill "gpg -c failed!"
-			} | tee "$tmp_encrypted" | gpg_hash "$Hashtype")
+		pack_id=$(export GIT_ALTERNATE_OBJECT_DIRECTORIES=$Tempdir;
+			pipefail git pack-objects --stdout < "$tmp_objlist" |
+			pipefail ENCRYPT "$key_" |
+			tee "$tmp_encrypted" | gpg_hash "$Hashtype")
 
 		append_to @Packlist "pack :${Hashtype}:$pack_id $key_"
 		if isnonnull "$r_pack_delete"
