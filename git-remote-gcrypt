@@ -22,7 +22,6 @@ set -u # nounset
 set -f # noglob
 set -C # noclobber
 
-Localdir="${GIT_DIR:=.git}/remote-gcrypt"
 export GITCEPTION="${GITCEPTION:-}+" # Reuse $Gref except when stacked
 Gref="refs/gcrypt/gitception$GITCEPTION"
 Gref_rbranch="refs/heads/master"
@@ -34,6 +33,9 @@ Hex40=$Hex40$Hex40$Hex40$Hex40$Hex40$Hex40$Hex40$Hex40
 Hex40=$Hex40$Hex40$Hex40$Hex40$Hex40 # Match SHA-1 hexdigest
 
 Did_find_repo=  # yes for connected, no for no repo
+Localdir="${GIT_DIR:=.git}/remote-gcrypt"
+Tempdir=
+
 Repoid=
 Refslist=
 Packlist=
@@ -357,12 +359,6 @@ gpg_hash()
 	xecho "${hash_%:}"
 }
 
-# $1 type
-tempname()
-{
-	xecho "$Localdir/tmp_$1_.$$"
-}
-
 # Pass the branch/ref by pipe to git
 safe_git_rev_parse()
 {
@@ -505,7 +501,7 @@ ensure_connected()
 		Repoid=$(git config "remote.$r_name.gcrypt-id" || :)
 
 
-	tmp_manifest=$(tempname maniF)
+	tmp_manifest="$Tempdir/maniF"
 	GET "$URL" "$Manifestfile" "$tmp_manifest" 2>/dev/null || {
 		echo_info "Repository not found: $URL"
 		return 0
@@ -551,7 +547,7 @@ ensure_connected()
 get_verify_decrypt_pack()
 {
 	local rcv_id= tmp_encrypted=
-	tmp_encrypted=$(tempname packF)
+	tmp_encrypted="$Tempdir/packF"
 	GET "$URL" "$2" "$tmp_encrypted" &&
 	rcv_id=$(gpg_hash "$1" < "$tmp_encrypted") &&
 	iseq "$rcv_id" "$2" || echo_die "Packfile $2 does not match digest!"
@@ -615,8 +611,7 @@ repack_if_needed()
 	fi
 	echo_info "Repacking remote $NAME, ..."
 
-	rm -r -f "$Localdir/pack"
-	mkdir -p "$Localdir/pack"
+	mkdir "$Tempdir/pack"
 
 	# Split packages to keep and to repack
 	if isnonnull "$Keeplist"; then
@@ -631,9 +626,9 @@ $Keeplist
 EOF
 	fi
 
-	xfeed "$r_del_list" get_pack_files "$Localdir/pack/"
+	xfeed "$r_del_list" get_pack_files "$Tempdir/pack/"
 
-	(set +f; git verify-pack -v "$Localdir"/pack/*.idx ||
+	(set +f; git verify-pack -v "$Tempdir"/pack/*.idx ||
 	 echo_kill "git verify-pack failed!") |
 		grep -E '^[0-9a-f]{40}' | cut -f 1 -d ' '
 
@@ -729,8 +724,8 @@ do_push()
 $1
 EOF
 
-	tmp_encrypted=$(tempname packP)
-	tmp_objlist=$(tempname objlP)
+	tmp_encrypted="$Tempdir/packP"
+	tmp_objlist="$Tempdir/objlP"
 
 	{
 		xfeed "$r_revlist" git rev-list --objects --stdin --
@@ -743,7 +738,7 @@ EOF
 		key_=$(genkey "$Packkey_bytes")
 		pack_id=$(\
 			{
-				GIT_ALTERNATE_OBJECT_DIRECTORIES=$Localdir \
+				GIT_ALTERNATE_OBJECT_DIRECTORIES=$Tempdir \
 				git pack-objects --stdout < "$tmp_objlist" ||
 				echo_kill "git pack-objects failed!"
 			} | {
@@ -762,7 +757,7 @@ EOF
 	echo_info "Encrypting to: $Recipients"
 	echo_info "Requesting manifest signature"
 
-	tmp_manifest=$(tempname maniP)
+	tmp_manifest="$Tempdir/maniP"
 	PRIVENCRYPT "$Recipients" > "$tmp_manifest" <<EOF
 $Refslist
 $Packlist
@@ -786,7 +781,6 @@ EOF
 
 	# Delete packs
 	if isnonnull "$r_pack_delete"; then
-		rm -r -f "$Localdir/pack"
 		REMOVE "$URL" "$(xecho "$r_pack_delete" | \
 			while IFS=': ' read -r _ _ pack_
 			do
@@ -810,22 +804,29 @@ EOF
 
 cleanup_tmpfiles()
 {
-	(set +f; rm -f "$Localdir"/tmp_*".$$" >&2)
+	if isnonnull "${Tempdir%%*."$$"}"; then
+		echo_die "Unexpected Tempdir value: $Tempdir"
+	fi
+	rm -r -f -- "${Tempdir}" >&2
 }
 
 # handle git-remote-helpers protocol
 gcrypt_main_loop()
 {
-	local input_= input_inner= r_args=
+	local input_= input_inner= r_args= temp_key=
 
 	NAME=$1  # Remote name
 	URL=$2   # Remote URL
 
+	mkdir -p "$Localdir"
+
+	# Set up a subdirectory in /tmp
+	temp_key=$(genkey 9 | tr '/' _)
+	Tempdir="${TMPDIR:-/tmp}/git-remote-gcrypt-${temp_key}.$$"
+	mkdir -m 700 "${Tempdir}"
+
 	trap cleanup_tmpfiles EXIT
 	trap 'exit 1' 1 2 3 15
-
-	mkdir -p "$Localdir"
-	cleanup_tmpfiles
 
 	echo_info "Development version -- Repository format MAY CHANGE"
 
