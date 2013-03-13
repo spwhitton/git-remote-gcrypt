@@ -95,9 +95,7 @@ Notes
 Collaboration
     The encryption of the manifest is updated for each push to match the
     participant configuration. Each pushing user must have the public
-    keys of all collaborators and correct participant config. You can
-    commit a keyring to the repo; further key management features do not
-    yet exist.
+    keys of all collaborators and correct participant config.
 
 Dependencies
     ``rsync`` and ``curl`` for remotes ``rsync:`` and ``sftp:``
