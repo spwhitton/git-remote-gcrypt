@@ -388,21 +388,12 @@ make_new_repo()
 # $1 return var for goodsig match, $2 return var for signers text
 read_config()
 {
-	local recp_= r_keyinfo= cap_= conf_keyring= conf_part= good_sig= signers_=
+	local recp_= r_keyinfo= cap_= conf_part= good_sig= signers_=
 	Conf_signkey=$(git config --path user.signingkey || :)
-	conf_keyring=$(git config --path gcrypt.keyring || :)
 	conf_part=$(git config --get "remote.$NAME.gcrypt-participants" '.+' ||
 		    git config --get gcrypt.participants '.+' || :)
 
 	# Figure out which keys we should encrypt to or accept signatures from
-	if isnonnull "$conf_keyring" && isnull "$conf_part"
-	then
-		echo_info "WARNING: Setting gcrypt.keyring is deprecated," \
-			  "use gcrypt.participants instead."
-		conf_part=$(gpg --no-default-keyring --keyring "$conf_keyring" \
-		--with-colons --fast-list -k | grep ^pub | cut -f 5 -d :)
-	fi
-
 	if isnull "$conf_part" || iseq "$conf_part" simple
 	then
 		signers_="(default keyring)"
