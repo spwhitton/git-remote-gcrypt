@@ -1,0 +1,5 @@
+git-remote-gcrypt (0.20130908-1) unstable; urgency=low
+
+  * Initial release.
+
+ -- Joey Hess <joeyh@debian.org>  Sun, 08 Sep 2013 20:08:23 -0400
