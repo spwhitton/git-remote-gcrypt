@@ -389,7 +389,8 @@ make_new_repo()
 read_config()
 {
 	local recp_= r_keyinfo= cap_= conf_part= good_sig= signers_=
-	Conf_signkey=$(git config --path user.signingkey || :)
+	Conf_signkey=$(git config --get "remote.$NAME.gcrypt-signingkey" '.+' ||
+		git config --path user.signingkey || :)
 	conf_part=$(git config --get "remote.$NAME.gcrypt-participants" '.+' ||
 		    git config --get gcrypt.participants '.+' || :)
 

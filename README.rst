@@ -60,10 +60,13 @@ The following ``git-config(1)`` variables are supported:
     The ``gcrypt-participants`` setting on the remote takes precedence
     over the repository variable ``gcrypt.participants``.
 
+``remote.<name>.gcrypt-signingkey``
+    ..
 ``user.signingkey``
-    (From regular git configuration) The key to use for signing.  You
-    should set ``user.signingkey`` if your default signing key is not
-    part of the participant list.
+    (The latter from regular git configuration) The key to use for signing.
+    You should set ``user.signingkey`` if your default signing key is not
+    part of the participant list. You may use the per-remote version
+    to sign different remotes using different keys.
 
 Environment Variables
 =====================
