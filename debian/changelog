@@ -1,3 +1,9 @@
+git-remote-gcrypt (0.20130908-3) unstable; urgency=low
+
+  * Add remote.<name>.gcrypt-signingkey config.
+
+ -- Joey Hess <joeyh@debian.org>  Tue, 17 Sep 2013 15:33:35 -0400
+
 git-remote-gcrypt (0.20130908-2) unstable; urgency=low
 
   * Set --trust-model=always when encrypting.
