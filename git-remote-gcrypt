@@ -779,14 +779,8 @@ cleanup_tmpfiles()
 	rm -r -f -- "${Tempdir}" >&2
 }
 
-# handle git-remote-helpers protocol
-gcrypt_main_loop()
+setup()
 {
-	local input_= input_inner= r_args= temp_key=
-
-	NAME=$1  # Remote name
-	URL=$2   # Remote URL
-
 	mkdir -p "$Localdir"
 
 	# Set up a subdirectory in /tmp
@@ -798,6 +792,17 @@ gcrypt_main_loop()
 	trap 'exit 1' 1 2 3 15
 
 	echo_info "Development version -- Repository format MAY CHANGE"
+}
+
+# handle git-remote-helpers protocol
+gcrypt_main_loop()
+{
+	local input_= input_inner= r_args= temp_key=
+
+	NAME=$1  # Remote name
+	URL=$2   # Remote URL
+
+	setup
 
 	while read input_
 	do
@@ -849,4 +854,16 @@ gcrypt_main_loop()
 	done
 }
 
-gcrypt_main_loop "$@"
+if [ "x$1" = x--check ]
+then
+	NAME=dummy-gcrypt-check
+	URL=$2
+	setup
+	ensure_connected
+	if iseq "$Did_find_repo" "no"
+	then
+		exit 100
+	fi
+else
+	gcrypt_main_loop "$@"
+fi
