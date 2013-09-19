@@ -1,3 +1,9 @@
+git-remote-gcrypt (0.20130908-4) unstable; urgency=low
+
+  * Added --check option.
+
+ -- Joey Hess <joeyh@debian.org>  Thu, 19 Sep 2013 12:10:24 -0400
+
 git-remote-gcrypt (0.20130908-3) unstable; urgency=low
 
   * Add remote.<name>.gcrypt-signingkey config.
