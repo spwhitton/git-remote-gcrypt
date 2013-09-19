@@ -388,7 +388,7 @@ make_new_repo()
 # $1 return var for goodsig match, $2 return var for signers text
 read_config()
 {
-	local recp_= r_keyinfo= cap_= conf_part= good_sig= signers_=
+	local recp_= r_keyinfo= r_keyfpr= gpg_list= cap_= conf_part= good_sig= signers_=
 	Conf_signkey=$(git config --get "remote.$NAME.gcrypt-signingkey" '.+' ||
 		git config --path user.signingkey || :)
 	conf_part=$(git config --get "remote.$NAME.gcrypt-participants" '.+' ||
@@ -407,16 +407,21 @@ read_config()
 
 	for recp_ in $conf_part
 	do
-		filter_to @r_keyinfo "pub*" \
-			"$(gpg --with-colons --fast-list -k "$recp_")"
+		gpg_list=$(gpg --with-colons --fast-list --fingerprint -k "$recp_")
+		filter_to @r_keyinfo "pub*" "$gpg_list"
+		filter_to @r_keyfpr "fpr*" "$gpg_list"
 		isnull "$r_keyinfo" || isnonnull "${r_keyinfo##*"$Newline"*}" ||
 		echo_info "WARNING: '$recp_' matches multiple keys, using one"
+		isnull "$r_keyfpr" || isnonnull "${r_keyfpr##*"$Newline"*}" ||
+		echo_info "WARNING: '$recp_' matches multiple fingerprints, using one"
 		r_keyinfo=${r_keyinfo%%"$Newline"*}
+		r_keyfpr=${r_keyfpr%%"$Newline"*}
 		keyid_=$(xfeed "$r_keyinfo" cut -f 5 -d :)
+		fprid_=$(xfeed "$r_keyfpr" cut -f 10 -d :)
 
-		isnonnull "$keyid_" &&
+		isnonnull "$fprid_" &&
 		signers_="$signers_ $keyid_" &&
-		append_to @good_sig "^\[GNUPG:\] GOODSIG $keyid_" || {
+		append_to @good_sig "^\[GNUPG:\] VALIDSIG .*$fprid_$" || {
 			echo_info "WARNING: Skipping missing key $recp_"
 			continue
 		}
