@@ -173,6 +173,17 @@ Each item extends until newline, and matches one of the following:
 ``extn <name> ...``
     Extension field, preserved but unused.
 
+Detecting gcrypt repos
+======================
+
+To detect if a git url is a gcrypt repo, use: git-remote-gcrypt --check url
+Exit status if 0 if the repo exists and can be decrypted, 1 if the repo
+uses gcrypt but could not be decrypted, and 100 if the repo does not 
+exist or could not be accessed.
+
+Note that this has to fetch the repo contents into the local git
+repository, the same as is done when using a gcrypt repo.
+
 See Also
 ========
 
