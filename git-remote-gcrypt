@@ -407,7 +407,7 @@ read_config()
 
 	for recp_ in $conf_part
 	do
-		gpg_list=$(gpg --with-colons --fast-list --fingerprint -k "$recp_")
+		gpg_list=$(gpg --with-colons --fingerprint -k "$recp_")
 		filter_to @r_keyinfo "pub*" "$gpg_list"
 		filter_to @r_keyfpr "fpr*" "$gpg_list"
 		isnull "$r_keyinfo" || isnonnull "${r_keyinfo##*"$Newline"*}" ||
