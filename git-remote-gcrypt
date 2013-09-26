@@ -407,8 +407,7 @@ read_config()
 
 	for recp_ in $conf_part
 	do
-		filter_to @r_keyinfo "pub*" \
-			"$(gpg --with-colons --fast-list -k "$recp_")"
+		filter_to @r_keyinfo "pub*" "$(gpg --with-colons -k "$recp_")"
 		isnull "$r_keyinfo" || isnonnull "${r_keyinfo##*"$Newline"*}" ||
 		echo_info "WARNING: '$recp_' matches multiple keys, using one"
 		r_keyinfo=${r_keyinfo%%"$Newline"*}
