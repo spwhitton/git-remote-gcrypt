@@ -1,10 +1,12 @@
-git-remote-gcrypt (0.20130908-5) UNRELEASED; urgency=low
+git-remote-gcrypt (0.20130908-5) unstable; urgency=low
 
+  * Better signature validation for subkeys.
+    Closes https://github.com/blake2-ppc/git-remote-gcrypt/pull/7
   * Stop passing --fast-list to gpg as this sometimes causes it to not
     display key fingerprints, which git-remote-gcrpyt needs.
     Closes https://github.com/blake2-ppc/git-remote-gcrypt/issues/8
 
- -- Joey Hess <joeyh@debian.org>  Thu, 26 Sep 2013 15:37:57 -0400
+ -- Joey Hess <joeyh@debian.org>  Thu, 26 Sep 2013 15:58:52 -0400
 
 git-remote-gcrypt (0.20130908-4) unstable; urgency=low
 
