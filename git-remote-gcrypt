@@ -865,6 +865,7 @@ then
 	URL=$2
 	setup
 	ensure_connected
+	git remote remove $NAME 2>/dev/null || true
 	if iseq "$Did_find_repo" "no"
 	then
 		exit 100
