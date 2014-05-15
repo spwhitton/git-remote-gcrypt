@@ -1,11 +1,11 @@
-git-remote-gcrypt (0.20130908-6) UNRELEASED; urgency=medium
+git-remote-gcrypt (0.20130908-6) unstable; urgency=medium
 
   * Fix to work when there is no controlling terminal, but GPG_AGENT_INFO
     is set. Pass --no-tty to gpg in this situation. This is needed
     to interoperate with the git-annex assistant, which often runs without
     a controlling terminal, and will in a new version always do so.
 
- -- Joey Hess <joeyh@debian.org>  Thu, 15 May 2014 14:25:52 -0400
+ -- Joey Hess <joeyh@debian.org>  Thu, 15 May 2014 14:35:03 -0400
 
 git-remote-gcrypt (0.20130908-5) unstable; urgency=low
 
