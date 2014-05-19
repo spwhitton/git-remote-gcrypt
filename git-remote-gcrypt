@@ -176,8 +176,10 @@ update_tree()
 {
 	local tab_="	"
 	# $2 is a filename from the repo format
-	(git ls-tree "$1" | xgrep -v -E '\b'"$2"'$';
-		xecho "100644 blob $3$tab_$2") | git mktree
+	(set +e;
+		git ls-tree "$1" | xgrep -v -E '\b'"$2"'$';
+		xecho "100644 blob $3$tab_$2"
+	) | git mktree
 }
 
 # Put giturl $1, file $2
