@@ -1,4 +1,13 @@
-git-remote-gcrypt (0.20130908-5~bpo70+1) wheezy-backports; urgency=low
+git-remote-gcrypt (0.20130908-6) unstable; urgency=medium
+
+  * Fix to work when there is no controlling terminal, but GPG_AGENT_INFO
+    is set. Pass --no-tty to gpg in this situation. This is needed
+    to interoperate with the git-annex assistant, which often runs without
+    a controlling terminal, and will in a new version always do so.
+
+ -- Joey Hess <joeyh@debian.org>  Thu, 15 May 2014 14:35:03 -0400
+
+git-remote-gcrypt (0.20130908-5) unstable; urgency=low
 
   * Better signature validation for subkeys.
     Closes https://github.com/blake2-ppc/git-remote-gcrypt/pull/7
