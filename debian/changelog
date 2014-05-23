@@ -1,4 +1,4 @@
-git-remote-gcrypt (0.20130908-5) unstable; urgency=low
+git-remote-gcrypt (0.20130908-5~bpo70+1) wheezy-backports; urgency=low
 
   * Better signature validation for subkeys.
     Closes https://github.com/blake2-ppc/git-remote-gcrypt/pull/7
