@@ -60,6 +60,17 @@ The following ``git-config(1)`` variables are supported:
     The ``gcrypt-participants`` setting on the remote takes precedence
     over the repository variable ``gcrypt.participants``.
 
+``remote.<name>.gcrypt-publish-participants``
+    ..
+``gcrypt.publish-participants``
+    By default, the gpg key ids of the participants are obscured by
+    encrypting using `gpg -R`. Setting this option to `true` disables
+    that security measure.
+
+    The problem with using `gpg -R` is that to decrypt, gpg tries each
+    available secret key in turn until it finds a usable key.
+    This can result in unncessary passphrase prompts.
+
 ``remote.<name>.gcrypt-signingkey``
     ..
 ``user.signingkey``
@@ -67,6 +78,7 @@ The following ``git-config(1)`` variables are supported:
     You should set ``user.signingkey`` if your default signing key is not
     part of the participant list. You may use the per-remote version
     to sign different remotes using different keys.
+
 
 Environment Variables
 =====================
