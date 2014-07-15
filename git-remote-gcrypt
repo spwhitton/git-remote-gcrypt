@@ -406,6 +406,8 @@ read_config()
 		git config --path user.signingkey || :)
 	conf_part=$(git config --get "remote.$NAME.gcrypt-participants" '.+' ||
 		    git config --get gcrypt.participants '.+' || :)
+	Conf_pubish_participants=$(git config --get --bool "remote.$NAME.gcrypt-publish-participants" '.+' ||
+		git config --get --bool gcrypt.publish-participants || :)
 
 	# Figure out which keys we should encrypt to or accept signatures from
 	if isnull "$conf_part" || iseq "$conf_part" simple
@@ -440,7 +442,13 @@ read_config()
 		}
 		# Check 'E'ncrypt capability
 		cap_=$(xfeed "$r_keyinfo" cut -f 12 -d :)
-		iseq "${cap_#*E}" "$cap_" || Recipients="$Recipients -R $keyid_"
+		if ! iseq "${cap_#*E}" "$cap_"; then
+			if [ "$Conf_pubish_participants" = true ]; then
+				Recipients="$Recipients -r $keyid_"
+			else
+				Recipients="$Recipients -R $keyid_"
+			fi
+		fi
 	done
 
 	if isnull "$Recipients"
