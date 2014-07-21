@@ -1,3 +1,9 @@
+git-remote-gcrypt (0.20130908-7~bpo70+1) wheezy-backports; urgency=medium
+
+  * Updating wheezy backport, for git-annex.
+
+ -- Joey Hess <joeyh@debian.org>  Mon, 21 Jul 2014 13:13:01 -0400
+
 git-remote-gcrypt (0.20130908-7) unstable; urgency=medium
 
   * Added gcrypt.publish-participants configuration setting.
