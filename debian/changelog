@@ -1,3 +1,11 @@
+git-remote-gcrypt (0.20140715-1) UNRELEASED; urgency=medium
+
+  * Adopt git-remote-gcrypt package (Closes: #771020).
+  * Switch dpkg-source format to 3.0 (quilt).
+  * Package new upstream version 0.20140715.
+
+ -- Sean Whitton <spwhitton@spwhitton.name>  Sat, 12 Dec 2015 21:27:32 +0000
+
 git-remote-gcrypt (0.20130908-7) unstable; urgency=medium
 
   * Added gcrypt.publish-participants configuration setting.
