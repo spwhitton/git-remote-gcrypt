@@ -1,0 +1,260 @@
+From: Sean Whitton <spwhitton@spwhitton.name>
+Date: Sat, 12 Dec 2015 16:06:55 -0700
+Subject: joeyh-patches
+
+---
+ README.rst        | 32 +++++++++++++++++--
+ git-remote-gcrypt | 93 +++++++++++++++++++++++++++++++++++++++++--------------
+ 2 files changed, 98 insertions(+), 27 deletions(-)
+
+diff --git a/README.rst b/README.rst
+index f177913..ba06259 100644
+--- a/README.rst
++++ b/README.rst
+@@ -60,10 +60,25 @@ The following ``git-config(1)`` variables are supported:
+     The ``gcrypt-participants`` setting on the remote takes precedence
+     over the repository variable ``gcrypt.participants``.
+ 
++``remote.<name>.gcrypt-publish-participants``
++    ..
++``gcrypt.publish-participants``
++    By default, the gpg key ids of the participants are obscured by
++    encrypting using `gpg -R`. Setting this option to `true` disables
++    that security measure.
++
++    The problem with using `gpg -R` is that to decrypt, gpg tries each
++    available secret key in turn until it finds a usable key.
++    This can result in unncessary passphrase prompts.
++
++``remote.<name>.gcrypt-signingkey``
++    ..
+ ``user.signingkey``
+-    (From regular git configuration) The key to use for signing.  You
+-    should set ``user.signingkey`` if your default signing key is not
+-    part of the participant list.
++    (The latter from regular git configuration) The key to use for signing.
++    You should set ``user.signingkey`` if your default signing key is not
++    part of the participant list. You may use the per-remote version
++    to sign different remotes using different keys.
++
+ 
+ Environment Variables
+ =====================
+@@ -170,6 +185,17 @@ Each item extends until newline, and matches one of the following:
+ ``extn <name> ...``
+     Extension field, preserved but unused.
+ 
++Detecting gcrypt repos
++======================
++
++To detect if a git url is a gcrypt repo, use: git-remote-gcrypt --check url
++Exit status if 0 if the repo exists and can be decrypted, 1 if the repo
++uses gcrypt but could not be decrypted, and 100 if the repo is not
++encrypted with gcrypt (or could not be accessed).
++
++Note that this has to fetch the repo contents into the local git
++repository, the same as is done when using a gcrypt repo.
++
+ See Also
+ ========
+ 
+diff --git a/git-remote-gcrypt b/git-remote-gcrypt
+index bb19652..8d68669 100755
+--- a/git-remote-gcrypt
++++ b/git-remote-gcrypt
+@@ -18,7 +18,6 @@
+ # See README.rst for usage instructions
+ 
+ set -e # errexit
+-set -u # nounset
+ set -f # noglob
+ set -C # noclobber
+ 
+@@ -177,8 +176,10 @@ update_tree()
+ {
+ 	local tab_="	"
+ 	# $2 is a filename from the repo format
+-	(git ls-tree "$1" | xgrep -v -E '\b'"$2"'$';
+-		xecho "100644 blob $3$tab_$2") | git mktree
++	(set +e;
++		git ls-tree "$1" | xgrep -v -E '\b'"$2"'$';
++		xecho "100644 blob $3$tab_$2"
++	) | git mktree
+ }
+ 
+ # Put giturl $1, file $2
+@@ -313,14 +314,14 @@ CLEAN_FINAL()
+ 
+ ENCRYPT()
+ {
+-	gpg --batch --force-mdc --compress-algo none --passphrase-fd 3 -c 3<<EOF
++	rungpg --batch --force-mdc --compress-algo none --trust-model=always --passphrase-fd 3 -c 3<<EOF
+ $1
+ EOF
+ }
+ 
+ DECRYPT()
+ {
+-	gpg -q --batch --no-default-keyring --secret-keyring /dev/null \
++	rungpg -q --batch --no-default-keyring --secret-keyring /dev/null \
+ 		--keyring /dev/null --passphrase-fd 3 -d  3<<EOF
+ $1
+ EOF
+@@ -333,7 +334,7 @@ PRIVENCRYPT()
+ 	if isnonnull "$Conf_signkey"; then
+ 		set -- "$@" -u "$Conf_signkey"
+ 	fi
+-	gpg --compress-algo none -se "$@"
++	rungpg --compress-algo none --trust-model=always -se "$@"
+ }
+ 
+ # $1 is the match for good signature, $2 is the textual signers list
+@@ -341,7 +342,7 @@ PRIVDECRYPT()
+ {
+ 	local status_=
+ 	exec 4>&1 &&
+-	status_=$(gpg  --status-fd 3 -q -d 3>&1 1>&4) &&
++	status_=$(rungpg --status-fd 3 -q -d 3>&1 1>&4) &&
+ 	xfeed "$status_" grep "^\[GNUPG:\] ENC_TO " >/dev/null &&
+ 	(xfeed "$status_" grep -e "$1" >/dev/null || {
+ 		echo_info "Failed to verify manifest signature!" &&
+@@ -353,17 +354,29 @@ PRIVDECRYPT()
+ # Generate $1 random bytes
+ genkey()
+ {
+-	gpg --armor --gen-rand 1 "$1"
++	rungpg --armor --gen-rand 1 "$1"
+ }
+ 
+ gpg_hash()
+ {
+ 	local hash_=
+-	hash_=$(gpg --with-colons --print-md "$1" | tr A-F a-f)
++	hash_=$(rungpg --with-colons --print-md "$1" | tr A-F a-f)
+ 	hash_=${hash_#:*:}
+ 	xecho "${hash_%:}"
+ }
+ 
++rungpg()
++{
++	# gpg will fail to run when there is no controlling tty,
++	# due to trying to print messages to it, even if a gpg agent is set
++	# up. --no-tty fixes this.
++	if [ "x$GPG_AGENT_INFO" != "x" ]; then
++		gpg --no-tty "$@"
++	else
++		gpg "$@"
++	fi
++}
++
+ # Pass the branch/ref by pipe to git
+ safe_git_rev_parse()
+ {
+@@ -388,10 +401,13 @@ make_new_repo()
+ # $1 return var for goodsig match, $2 return var for signers text
+ read_config()
+ {
+-	local recp_= r_keyinfo= cap_= conf_part= good_sig= signers_=
+-	Conf_signkey=$(git config --path user.signingkey || :)
++	local recp_= r_keyinfo= r_keyfpr= gpg_list= cap_= conf_part= good_sig= signers_=
++	Conf_signkey=$(git config --get "remote.$NAME.gcrypt-signingkey" '.+' ||
++		git config --path user.signingkey || :)
+ 	conf_part=$(git config --get "remote.$NAME.gcrypt-participants" '.+' ||
+ 		    git config --get gcrypt.participants '.+' || :)
++	Conf_pubish_participants=$(git config --get --bool "remote.$NAME.gcrypt-publish-participants" '.+' ||
++		git config --get --bool gcrypt.publish-participants || :)
+ 
+ 	# Figure out which keys we should encrypt to or accept signatures from
+ 	if isnull "$conf_part" || iseq "$conf_part" simple
+@@ -406,22 +422,33 @@ read_config()
+ 
+ 	for recp_ in $conf_part
+ 	do
+-		filter_to @r_keyinfo "pub*" \
+-			"$(gpg --with-colons --fast-list -k "$recp_")"
++		gpg_list=$(rungpg --with-colons --fingerprint -k "$recp_")
++		filter_to @r_keyinfo "pub*" "$gpg_list"
++		filter_to @r_keyfpr "fpr*" "$gpg_list"
+ 		isnull "$r_keyinfo" || isnonnull "${r_keyinfo##*"$Newline"*}" ||
+ 		echo_info "WARNING: '$recp_' matches multiple keys, using one"
++		isnull "$r_keyfpr" || isnonnull "${r_keyfpr##*"$Newline"*}" ||
++		echo_info "WARNING: '$recp_' matches multiple fingerprints, using one"
+ 		r_keyinfo=${r_keyinfo%%"$Newline"*}
++		r_keyfpr=${r_keyfpr%%"$Newline"*}
+ 		keyid_=$(xfeed "$r_keyinfo" cut -f 5 -d :)
++		fprid_=$(xfeed "$r_keyfpr" cut -f 10 -d :)
+ 
+-		isnonnull "$keyid_" &&
++		isnonnull "$fprid_" &&
+ 		signers_="$signers_ $keyid_" &&
+-		append_to @good_sig "^\[GNUPG:\] GOODSIG $keyid_" || {
++		append_to @good_sig "^\[GNUPG:\] VALIDSIG .*$fprid_$" || {
+ 			echo_info "WARNING: Skipping missing key $recp_"
+ 			continue
+ 		}
+ 		# Check 'E'ncrypt capability
+ 		cap_=$(xfeed "$r_keyinfo" cut -f 12 -d :)
+-		iseq "${cap_#*E}" "$cap_" || Recipients="$Recipients -R $keyid_"
++		if ! iseq "${cap_#*E}" "$cap_"; then
++			if [ "$Conf_pubish_participants" = true ]; then
++				Recipients="$Recipients -r $keyid_"
++			else
++				Recipients="$Recipients -R $keyid_"
++			fi
++		fi
+ 	done
+ 
+ 	if isnull "$Recipients"
+@@ -778,14 +805,8 @@ cleanup_tmpfiles()
+ 	rm -r -f -- "${Tempdir}" >&2
+ }
+ 
+-# handle git-remote-helpers protocol
+-gcrypt_main_loop()
++setup()
+ {
+-	local input_= input_inner= r_args= temp_key=
+-
+-	NAME=$1  # Remote name
+-	URL=$2   # Remote URL
+-
+ 	mkdir -p "$Localdir"
+ 
+ 	# Set up a subdirectory in /tmp
+@@ -797,6 +818,17 @@ gcrypt_main_loop()
+ 	trap 'exit 1' 1 2 3 15
+ 
+ 	echo_info "Development version -- Repository format MAY CHANGE"
++}
++
++# handle git-remote-helpers protocol
++gcrypt_main_loop()
++{
++	local input_= input_inner= r_args= temp_key=
++
++	NAME=$1  # Remote name
++	URL=$2   # Remote URL
++
++	setup
+ 
+ 	while read input_
+ 	do
+@@ -848,4 +880,17 @@ gcrypt_main_loop()
+ 	done
+ }
+ 
+-gcrypt_main_loop "$@"
++if [ "x$1" = x--check ]
++then
++	NAME=dummy-gcrypt-check
++	URL=$2
++	setup
++	ensure_connected
++	git remote remove $NAME 2>/dev/null || true
++	if iseq "$Did_find_repo" "no"
++	then
++		exit 100
++	fi
++else
++	gcrypt_main_loop "$@"
++fi
