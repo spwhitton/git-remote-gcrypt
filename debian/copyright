@@ -1,8 +1,14 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Source: https://github.com/blake2-ppc/git-remote-gcrypt
+Source: https://github.com/joeyh/git-remote-gcrypt
 
 Files: *
-Copyright: 2013 by engla
+Copyright: (C) 2013 engla
+ (C) 2013, 2014 Joey Hess <id@joeyh.name>
 License: GPL-2+
  On Debian systems, the complete text of the GPL can be found in
  /usr/share/common-licenses/GPL.
+
+Files: debian/*
+Copyright: (C) 2015 Sean Whitton <spwhitton@spwhitton.name>
+ (C) 2013, 2014 Joey Hess <id@joeyh.name>
+License: GPL-2+
