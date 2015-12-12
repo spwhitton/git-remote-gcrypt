@@ -2,9 +2,11 @@ Source: git-remote-gcrypt
 Section: vcs
 Priority: optional
 Build-Depends: debhelper (>= 9), dpkg-dev (>= 1.9.0)
-Maintainer: Joey Hess <joeyh@debian.org>
-Standards-Version: 3.9.4
-Homepage: https://github.com/blake2-ppc/git-remote-gcrypt
+Maintainer: Sean Whitton <spwhitton@spwhitton.name>
+Standards-Version: 3.9.6
+Homepage: https://github.com/joeyh/git-remote-gcrypt
+Vcs-Git: https://git.spwhitton.name/git-remote-gcrypt
+Vcs-Browser: https://git.spwhitton.name/?p=git-remote-gcrypt.git;a=summary
 
 Package: git-remote-gcrypt
 Architecture: all
