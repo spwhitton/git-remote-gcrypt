@@ -1,0 +1,22 @@
+Source: git-remote-gcrypt
+Section: vcs
+Priority: optional
+Build-Depends: debhelper (>= 9), dpkg-dev (>= 1.9.0)
+Maintainer: Joey Hess <joeyh@debian.org>
+Standards-Version: 3.9.4
+Homepage: https://github.com/blake2-ppc/git-remote-gcrypt
+
+Package: git-remote-gcrypt
+Architecture: all
+Section: vcs
+Depends: git, gnupg | gnupg2, ${misc:Depends}
+Recommends: rsync, curl
+Description: encrypted git repositories
+ This lets git store git repositories in encrypted form.
+ It supports storing repositories on rsync or sftp servers.
+ It can also store the encrypted git repository inside a remote git
+ repository. All the regular git commands like git push and git pull
+ can be used to operate on such an encrypted repository.
+ .
+ The aim is to provide confidential, authenticated git storage and
+ collaboration using typical untrusted file hosts or services.
