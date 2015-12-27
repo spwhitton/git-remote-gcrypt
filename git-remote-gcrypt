@@ -507,7 +507,12 @@ ensure_connected()
 	tmp_manifest="$Tempdir/maniF"
 	GET "$URL" "$Manifestfile" "$tmp_manifest" 2>/dev/null || {
 		echo_info "Repository not found: $URL"
-		return 0
+		if ! isnull "$Repoid"; then
+			echo_info "..but repository ID is set. Aborting."
+			return 1
+		else
+			return 0
+		fi
 	}
 
 	Did_find_repo=yes
