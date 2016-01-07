@@ -10,7 +10,6 @@ Vcs-Browser: https://git.spwhitton.name/?p=git-remote-gcrypt.git;a=summary
 
 Package: git-remote-gcrypt
 Architecture: all
-Section: vcs
 Depends: git, gnupg | gnupg2, ${misc:Depends}
 Recommends: rsync, curl
 Description: encrypted git repositories
