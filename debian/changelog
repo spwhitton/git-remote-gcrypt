@@ -1,11 +1,11 @@
-git-remote-gcrypt (0.20130908-8) unstable; urgency=medium
+git-remote-gcrypt (0.20130908-8) UNRELEASED; urgency=medium
 
   * Adopt git-remote-gcrypt package (Closes: #771020).
   * Switch dpkg-source format to 3.0 (quilt).
     Move changes by Joey Hess into a quilt patch.
   * Install man page using rst2man, rather than just installing README.rst.
 
- -- Sean Whitton <spwhitton@spwhitton.name>  Sat, 12 Dec 2015 16:16:57 -0700
+ -- Sean Whitton <spwhitton@spwhitton.name>  Sat, 12 Dec 2015 15:27:49 -0700
 
 git-remote-gcrypt (0.20130908-7) unstable; urgency=medium
 
