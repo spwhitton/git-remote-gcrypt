@@ -60,10 +60,25 @@ The following ``git-config(1)`` variables are supported:
     The ``gcrypt-participants`` setting on the remote takes precedence
     over the repository variable ``gcrypt.participants``.
 
+``remote.<name>.gcrypt-publish-participants``
+    ..
+``gcrypt.publish-participants``
+    By default, the gpg key ids of the participants are obscured by
+    encrypting using `gpg -R`. Setting this option to `true` disables
+    that security measure.
+
+    The problem with using `gpg -R` is that to decrypt, gpg tries each
+    available secret key in turn until it finds a usable key.
+    This can result in unncessary passphrase prompts.
+
+``remote.<name>.gcrypt-signingkey``
+    ..
 ``user.signingkey``
-    (From regular git configuration) The key to use for signing.  You
-    should set ``user.signingkey`` if your default signing key is not
-    part of the participant list.
+    (The latter from regular git configuration) The key to use for signing.
+    You should set ``user.signingkey`` if your default signing key is not
+    part of the participant list. You may use the per-remote version
+    to sign different remotes using different keys.
+
 
 Environment Variables
 =====================
@@ -169,6 +184,17 @@ Each item extends until newline, and matches one of the following:
 
 ``extn <name> ...``
     Extension field, preserved but unused.
+
+Detecting gcrypt repos
+======================
+
+To detect if a git url is a gcrypt repo, use: git-remote-gcrypt --check url
+Exit status if 0 if the repo exists and can be decrypted, 1 if the repo
+uses gcrypt but could not be decrypted, and 100 if the repo is not
+encrypted with gcrypt (or could not be accessed).
+
+Note that this has to fetch the repo contents into the local git
+repository, the same as is done when using a gcrypt repo.
 
 See Also
 ========
