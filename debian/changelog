@@ -9,6 +9,7 @@ git-remote-gcrypt (0.20130908-8) UNRELEASED; urgency=medium
     Update debian/copyright accordingly.
   * Bump Standards-Version.
   * Add debian/gbp.conf.
+  * Override Lintian tags no-upstream-changelog & debian-watch-file-is-missing.
 
  -- Sean Whitton <spwhitton@spwhitton.name>  Sat, 12 Dec 2015 15:27:49 -0700
 
