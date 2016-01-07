@@ -1,7 +1,8 @@
 git-remote-gcrypt (0.20130908-8) UNRELEASED; urgency=medium
 
   * Adopt git-remote-gcrypt package (Closes: #771020).
-  * Install man page using rst2man, rather than just installing README.rst (Closes: #725455).
+  * Install man page using rst2man, rather than just installing README.rst
+    (Closes: #725455).
   * Add Vcs-Git: & Vcs-Browser: pointing at my repository.
   * Switch dpkg-source format to 3.0 (quilt).
   * Move changes by Joey Hess into a quilt patch.
