@@ -1,4 +1,4 @@
-git-remote-gcrypt (0.20130908-8) UNRELEASED; urgency=medium
+git-remote-gcrypt (0.20130908-8) unstable; urgency=medium
 
   * Adopt git-remote-gcrypt package (Closes: #771020).
   * Install man page using rst2man, rather than just installing README.rst
@@ -10,7 +10,7 @@ git-remote-gcrypt (0.20130908-8) UNRELEASED; urgency=medium
   * Bump Standards-Version.
   * Add debian/gbp.conf.
 
- -- Sean Whitton <spwhitton@spwhitton.name>  Sat, 12 Dec 2015 15:27:49 -0700
+ -- Sean Whitton <spwhitton@spwhitton.name>  Thu, 07 Jan 2016 10:22:33 -0700
 
 git-remote-gcrypt (0.20130908-7) unstable; urgency=medium
 
