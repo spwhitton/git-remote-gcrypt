@@ -30,6 +30,7 @@ Manifestfile=91bd0c092128cf2e60e1a608c31e92caf1f9c1595f83f2890ef17c0e4881aa0a
 Hex40="[a-f0-9]"
 Hex40=$Hex40$Hex40$Hex40$Hex40$Hex40$Hex40$Hex40$Hex40
 Hex40=$Hex40$Hex40$Hex40$Hex40$Hex40 # Match SHA-1 hexdigest
+GPG="$(git config --get "gpg.program" '.+' || echo gpg)"
 
 Did_find_repo=  # yes for connected, no for no repo
 Localdir="${GIT_DIR:=.git}/remote-gcrypt"
@@ -371,9 +372,9 @@ rungpg()
 	# due to trying to print messages to it, even if a gpg agent is set
 	# up. --no-tty fixes this.
 	if [ "x$GPG_AGENT_INFO" != "x" ]; then
-		gpg --no-tty "${GCRYPT_GPG_ARGS:-}" "$@"
+		${GPG} --no-tty "${GCRYPT_GPG_ARGS:-}" "$@"
 	else
-		gpg "${GCRYPT_GPG_ARGS:-}" "$@"
+		${GPG} "${GCRYPT_GPG_ARGS:-}" "$@"
 	fi
 }
 
