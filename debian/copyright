@@ -1,17 +1,15 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Source: https://github.com/bluss/git-remote-gcrypt
+Source: https://git.spwhitton.name/git-remote-gcrypt
 
 Files: *
 Copyright: (C) 2013 engla
+ (C) 2013, 2014 Joey Hess <id@joeyh.name>
+ (C) 2016 Sean Whitton and contributors
 License: GPL-2+
 
 Files: debian/*
 Copyright: (C) 2015 Sean Whitton <spwhitton@spwhitton.name>
  (C) 2013, 2014 Joey Hess <id@joeyh.name>
-License: GPL-2+
-
-Files: debian/patches/0001-joeyh-patches.patch
-Copyright: (C) 2013, 2014 Joey Hess <id@joeyh.name>
 License: GPL-2+
 
 License: GPL-2+
