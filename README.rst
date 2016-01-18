@@ -84,6 +84,10 @@ Environment Variables
 *GCRYPT_FULL_REPACK*
     This environment variable forces full repack when pushing.
 
+*GCRYPT_GPG_ARGS*
+    The contents of this environment variable are passed as arguments
+    to gpg.  E.g. ``export GCRYPT_GPG_ARGS="--use-agent"``.
+
 Examples
 ========
 

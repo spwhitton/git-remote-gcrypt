@@ -371,9 +371,9 @@ rungpg()
 	# due to trying to print messages to it, even if a gpg agent is set
 	# up. --no-tty fixes this.
 	if [ "x$GPG_AGENT_INFO" != "x" ]; then
-		gpg --no-tty "$@"
+		gpg --no-tty "${GCRYPT_GPG_ARGS:-}" "$@"
 	else
-		gpg "$@"
+		gpg "${GCRYPT_GPG_ARGS:-}" "$@"
 	fi
 }
 
