@@ -1,3 +1,10 @@
+git-remote-gcrypt (1.0.0) UNRELEASED; urgency=medium
+
+  * Switch to Debian-native package: taking over as upstream.
+  * Remove notice about repository format potentially changing.
+
+ -- Sean Whitton <spwhitton@spwhitton.name>  Sun, 17 Jan 2016 19:12:42 -0700
+
 git-remote-gcrypt (0.20130908-8) unstable; urgency=medium
 
   * Adopt git-remote-gcrypt package (Closes: #771020).

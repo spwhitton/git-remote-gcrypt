@@ -24,8 +24,6 @@ The aim is to provide confidential, authenticated git storage and
 collaboration using typical untrusted file hosts or services.
 PLEASE help us evaluate how well we meet this design goal!
 
-.. NOTE:: This is a development version -- Repository format MAY CHANGE.
-
 Quickstart
 ..........
 
