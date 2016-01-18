@@ -27,9 +27,7 @@ PLEASE help us evaluate how well we meet this design goal!
 Quickstart
 ..........
 
-* Install ``git-remote-gcrypt`` by running the supplied ``install.sh`` script.
-
-* Create an encrypted remote by pushing to it::
+Create an encrypted remote by pushing to it::
 
     git remote add cryptremote gcrypt::rsync://example.com:repo
     git push cryptremote master
