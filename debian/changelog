@@ -1,6 +1,7 @@
 git-remote-gcrypt (1.0.0-1) UNRELEASED; urgency=medium
 
-  * New upstream release incorporating changes by Joey Hess (Closes: #771011).
+  * New upstream release incorporating changes by Joey Hess and others (Closes: #771011).
+    Drop quilt patch containing his changes.
   * Patch README.rst to remove references to installation.
   * Drop Lintian override of no-upstream-changelog.
   * Update URIs in old changelog entries.
