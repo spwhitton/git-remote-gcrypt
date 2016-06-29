@@ -11,7 +11,7 @@ git-remote-gcrypt (1.0.0-1) UNRELEASED; urgency=medium
 
   Debian packaging:
   * Drop patch containing changes by Joey Hess: incorporated in release.
-    Update d/copyright accordingly.
+    - Update d/copyright accordingly.
   * Patch README.rst to remove references to installation.
   * Drop Lintian override of no-upstream-changelog.
   * Update URIs in old changelog entries.
