@@ -2,12 +2,12 @@ git-remote-gcrypt (1.0.0-1) UNRELEASED; urgency=medium
 
   Upstream:
   * Taking over as upstream maintainer.
-    Closes: https://github.com/bluss/git-remote-gcrypt/issues/12
+    Closes https://github.com/bluss/git-remote-gcrypt/issues/12
   * Remove notice about repository format potentially changing.
   * Implement GCRYPT_GPG_ARGS environment variable (Closes: #771011).
   * Respect git config gpg.program if configured.
     Thanks Christian Amsüss.
-    Closes: https://github.com/joeyh/git-remote-gcrypt/pull/3
+    Closes https://github.com/joeyh/git-remote-gcrypt/pull/3
 
   Debian packaging:
   * Drop patch containing changes by Joey Hess: incorporated in release.
