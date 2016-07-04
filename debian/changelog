@@ -8,6 +8,8 @@ git-remote-gcrypt (1.0.0-1) UNRELEASED; urgency=medium
   * Respect git config gpg.program if configured.
     Thanks Christian Amsüss.
     Closes https://github.com/joeyh/git-remote-gcrypt/pull/3
+  * Don't reset the remote ID when a gcrypt remote is not available.
+    Thanks Sebastian Reuße.
 
   Debian packaging:
   * Drop patch containing changes by Joey Hess: incorporated in release.
