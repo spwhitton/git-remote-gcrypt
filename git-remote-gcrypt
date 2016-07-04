@@ -405,7 +405,7 @@ make_new_repo()
 # $1 return var for goodsig match, $2 return var for signers text
 read_config()
 {
-	local recp_= r_keyinfo= r_keyfpr= gpg_list= cap_= conf_part= good_sig= signers_=
+	local recp_= r_tail= r_keyinfo= r_keyfpr= gpg_list= cap_= conf_part= good_sig= signers_=
 	Conf_signkey=$(git config --get "remote.$NAME.gcrypt-signingkey" '.+' ||
 		git config --path user.signingkey || :)
 	conf_part=$(git config --get "remote.$NAME.gcrypt-participants" '.+' ||
@@ -428,8 +428,13 @@ read_config()
 	for recp_ in $conf_part
 	do
 		gpg_list=$(rungpg --with-colons --fingerprint -k "$recp_")
+		r_tail_=$(echo "$recp_" | sed -e 's/^0x//')
 		filter_to @r_keyinfo "pub*" "$gpg_list"
-		filter_to @r_keyfpr "fpr*" "$gpg_list"
+		if echo "$recp_" | grep -E -q '^[xA-F0-9]+$'; then # is $recp_ a keyid?
+			filter_to @r_keyfpr "fpr*$r_tail_*" "$gpg_list"
+		else
+			filter_to @r_keyfpr "fpr*" "$gpg_list"
+		fi
 		isnull "$r_keyinfo" || isnonnull "${r_keyinfo##*"$Newline"*}" ||
 		echo_info "WARNING: '$recp_' matches multiple keys, using one"
 		isnull "$r_keyfpr" || isnonnull "${r_keyfpr##*"$Newline"*}" ||

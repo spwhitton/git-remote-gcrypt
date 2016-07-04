@@ -8,6 +8,9 @@ git-remote-gcrypt (1.0.0-1) UNRELEASED; urgency=medium
     Thanks Christian Amsüss.  (Closes: #827943)
   * Don't reset the remote ID when a gcrypt remote is not available.
     Thanks Sebastian Reuße.  (Closes: #827943)
+  * Suppress bogus warning about keyid matching multiple fingerprints.
+    Based on work by Raphaël Droz.
+    Closes https://github.com/joeyh/git-remote-gcrypt/pull/2
 
   Debian packaging:
   * Drop patch containing changes by Joey Hess: incorporated in release.
