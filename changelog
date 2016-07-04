@@ -1,0 +1,93 @@
+git-remote-gcrypt (1.0.0-1) unstable; urgency=medium
+
+  Upstream:
+  * Taking over as upstream maintainer.
+  * Remove notice about repository format potentially changing.
+  * Implement gcrypt.gpg-args git config setting (Closes: #771011).
+  * Respect git config gpg.program if configured.
+    Thanks Christian Amsüss.  (Closes: #827943)
+  * Don't reset the remote ID when a gcrypt remote is not available.
+    Thanks Sebastian Reuße.  (Closes: #827943)
+  * Suppress bogus warning about keyid matching multiple fingerprints.
+    Based on work by Raphaël Droz.
+    Closes https://github.com/joeyh/git-remote-gcrypt/pull/2
+  * Add "Note to users of GnuPG version 2" section to README.rst.
+    See https://github.com/joeyh/git-remote-gcrypt/pull/1
+
+  Debian packaging:
+  * Drop patch containing changes by Joey Hess: incorporated in release.
+    - Update d/copyright accordingly.
+  * Patch README.rst to remove references to installation.
+  * Add d/links to avoid duplicate changelogs Lintian warning.
+  * Drop Lintian override of no-upstream-changelog.
+  * Update URIs in old changelog entries.
+  * Add a comment to d/source/lintian-overrides.
+  * Bump standards version to 3.9.8 (no changes required).
+
+ -- Sean Whitton <spwhitton@spwhitton.name>  Mon, 04 Jul 2016 19:18:48 +0900
+
+git-remote-gcrypt (0.20130908-8) unstable; urgency=medium
+
+  * Adopt git-remote-gcrypt package (Closes: #771020).
+  * Install man page using rst2man, rather than just installing README.rst
+    (Closes: #725455).
+  * Add Vcs-Git: & Vcs-Browser: pointing at my repository.
+  * Switch dpkg-source format to 3.0 (quilt).
+  * Move changes by Joey Hess into a quilt patch.
+    Update debian/copyright accordingly.
+  * Bump Standards-Version.
+  * Add debian/gbp.conf.
+  * Override Lintian tags no-upstream-changelog & debian-watch-file-is-missing.
+
+ -- Sean Whitton <spwhitton@spwhitton.name>  Thu, 07 Jan 2016 11:03:01 -0700
+
+git-remote-gcrypt (0.20130908-7) unstable; urgency=medium
+
+  * Added gcrypt.publish-participants configuration setting.
+
+ -- Joey Hess <joeyh@debian.org>  Tue, 15 Jul 2014 17:40:22 -0400
+
+git-remote-gcrypt (0.20130908-6) unstable; urgency=medium
+
+  * Fix to work when there is no controlling terminal, but GPG_AGENT_INFO
+    is set. Pass --no-tty to gpg in this situation. This is needed
+    to interoperate with the git-annex assistant, which often runs without
+    a controlling terminal, and will in a new version always do so.
+
+ -- Joey Hess <joeyh@debian.org>  Thu, 15 May 2014 14:35:03 -0400
+
+git-remote-gcrypt (0.20130908-5) unstable; urgency=low
+
+  * Better signature validation for subkeys.
+    Closes https://github.com/bluss/git-remote-gcrypt/pull/7
+  * Stop passing --fast-list to gpg as this sometimes causes it to not
+    display key fingerprints, which git-remote-gcrpyt needs.
+    Closes https://github.com/bluss/git-remote-gcrypt/issues/8
+
+ -- Joey Hess <joeyh@debian.org>  Thu, 26 Sep 2013 15:58:52 -0400
+
+git-remote-gcrypt (0.20130908-4) unstable; urgency=low
+
+  * Added --check option.
+
+ -- Joey Hess <joeyh@debian.org>  Thu, 19 Sep 2013 12:10:24 -0400
+
+git-remote-gcrypt (0.20130908-3) unstable; urgency=low
+
+  * Add remote.<name>.gcrypt-signingkey config.
+
+ -- Joey Hess <joeyh@debian.org>  Tue, 17 Sep 2013 15:33:35 -0400
+
+git-remote-gcrypt (0.20130908-2) unstable; urgency=low
+
+  * Set --trust-model=always when encrypting.
+    Needed to interoperate with git-annex.
+    Closes https://github.com/bluss/git-remote-gcrypt/issues/3
+
+ -- Joey Hess <joeyh@debian.org>  Mon, 16 Sep 2013 15:49:16 -0400
+
+git-remote-gcrypt (0.20130908-1) unstable; urgency=low
+
+  * Initial release.
+
+ -- Joey Hess <joeyh@debian.org>  Sun, 08 Sep 2013 20:08:23 -0400

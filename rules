@@ -1,0 +1,11 @@
+#!/usr/bin/make -f
+%:
+	dh $@
+
+override_dh_auto_build:
+	true
+override_dh_auto_clean:
+	true
+
+override_dh_auto_install:
+	prefix=/usr DESTDIR=debian/git-remote-gcrypt ./install.sh
