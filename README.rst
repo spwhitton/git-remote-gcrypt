@@ -24,14 +24,10 @@ The aim is to provide confidential, authenticated git storage and
 collaboration using typical untrusted file hosts or services.
 PLEASE help us evaluate how well we meet this design goal!
 
-.. NOTE:: This is a development version -- Repository format MAY CHANGE.
-
 Quickstart
 ..........
 
-* Install ``git-remote-gcrypt`` by running the supplied ``install.sh`` script.
-
-* Create an encrypted remote by pushing to it::
+Create an encrypted remote by pushing to it::
 
     git remote add cryptremote gcrypt::rsync://example.com:repo
     git push cryptremote master
@@ -79,12 +75,26 @@ The following ``git-config(1)`` variables are supported:
     part of the participant list. You may use the per-remote version
     to sign different remotes using different keys.
 
+``gcrypt.gpg-args``
+    The contents of this setting are passed as arguments to gpg.
+    E.g. ``--use-agent``.
 
 Environment Variables
 =====================
 
 *GCRYPT_FULL_REPACK*
     This environment variable forces full repack when pushing.
+
+Note to users of GnuPG version 2
+================================
+
+When a repository was pushed with ``gcrypt.publish-participants``
+false (i.e. the recipient is anonymous), and you are using GnuPG
+version 2, you will need to include ``--try-all-secrets`` or
+``--try-secret-key ID`` in ``gcrypt.gpg-args``.
+
+GnuPG version 1 always tries all available secret keys when it
+encounters a message with an anonymous recipient.
 
 Examples
 ========

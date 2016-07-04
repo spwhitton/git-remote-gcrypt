@@ -30,6 +30,7 @@ Manifestfile=91bd0c092128cf2e60e1a608c31e92caf1f9c1595f83f2890ef17c0e4881aa0a
 Hex40="[a-f0-9]"
 Hex40=$Hex40$Hex40$Hex40$Hex40$Hex40$Hex40$Hex40$Hex40
 Hex40=$Hex40$Hex40$Hex40$Hex40$Hex40 # Match SHA-1 hexdigest
+GPG="$(git config --get "gpg.program" '.+' || echo gpg)"
 
 Did_find_repo=  # yes for connected, no for no repo
 Localdir="${GIT_DIR:=.git}/remote-gcrypt"
@@ -367,13 +368,16 @@ gpg_hash()
 
 rungpg()
 {
+	if isnonnull "$Conf_gpg_args"; then
+		set -- "$Conf_gpg_args" "$@"
+	fi
 	# gpg will fail to run when there is no controlling tty,
 	# due to trying to print messages to it, even if a gpg agent is set
 	# up. --no-tty fixes this.
 	if [ "x$GPG_AGENT_INFO" != "x" ]; then
-		gpg --no-tty "$@"
+		${GPG} --no-tty "$@"
 	else
-		gpg "$@"
+		${GPG} "$@"
 	fi
 }
 
@@ -401,13 +405,14 @@ make_new_repo()
 # $1 return var for goodsig match, $2 return var for signers text
 read_config()
 {
-	local recp_= r_keyinfo= r_keyfpr= gpg_list= cap_= conf_part= good_sig= signers_=
+	local recp_= r_tail= r_keyinfo= r_keyfpr= gpg_list= cap_= conf_part= good_sig= signers_=
 	Conf_signkey=$(git config --get "remote.$NAME.gcrypt-signingkey" '.+' ||
 		git config --path user.signingkey || :)
 	conf_part=$(git config --get "remote.$NAME.gcrypt-participants" '.+' ||
 		    git config --get gcrypt.participants '.+' || :)
 	Conf_pubish_participants=$(git config --get --bool "remote.$NAME.gcrypt-publish-participants" '.+' ||
 		git config --get --bool gcrypt.publish-participants || :)
+	Conf_gpg_args=$(git config --get gcrypt.gpg-args '.+' || :)
 
 	# Figure out which keys we should encrypt to or accept signatures from
 	if isnull "$conf_part" || iseq "$conf_part" simple
@@ -423,8 +428,13 @@ read_config()
 	for recp_ in $conf_part
 	do
 		gpg_list=$(rungpg --with-colons --fingerprint -k "$recp_")
+		r_tail_=$(echo "$recp_" | sed -e 's/^0x//')
 		filter_to @r_keyinfo "pub*" "$gpg_list"
-		filter_to @r_keyfpr "fpr*" "$gpg_list"
+		if echo "$recp_" | grep -E -q '^[xA-F0-9]+$'; then # is $recp_ a keyid?
+			filter_to @r_keyfpr "fpr*$r_tail_*" "$gpg_list"
+		else
+			filter_to @r_keyfpr "fpr*" "$gpg_list"
+		fi
 		isnull "$r_keyinfo" || isnonnull "${r_keyinfo##*"$Newline"*}" ||
 		echo_info "WARNING: '$recp_' matches multiple keys, using one"
 		isnull "$r_keyfpr" || isnonnull "${r_keyfpr##*"$Newline"*}" ||
@@ -505,7 +515,12 @@ ensure_connected()
 	tmp_manifest="$Tempdir/maniF"
 	GET "$URL" "$Manifestfile" "$tmp_manifest" 2>/dev/null || {
 		echo_info "Repository not found: $URL"
-		return 0
+		if ! isnull "$Repoid"; then
+			echo_info "..but repository ID is set. Aborting."
+			return 1
+		else
+			return 0
+		fi
 	}
 
 	Did_find_repo=yes
@@ -816,8 +831,6 @@ setup()
 
 	trap cleanup_tmpfiles EXIT
 	trap 'exit 1' 1 2 3 15
-
-	echo_info "Development version -- Repository format MAY CHANGE"
 }
 
 # handle git-remote-helpers protocol

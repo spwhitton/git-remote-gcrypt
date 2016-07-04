@@ -1,0 +1,24 @@
+From: Sean Whitton <spwhitton@spwhitton.name>
+Date: Sun, 17 Jan 2016 22:47:52 -0700
+Subject: Debianise-README
+
+Remove reference to installation.
+---
+ README.rst | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/README.rst b/README.rst
+index 148abad..19a9d9d 100644
+--- a/README.rst
++++ b/README.rst
+@@ -27,9 +27,7 @@ PLEASE help us evaluate how well we meet this design goal!
+ Quickstart
+ ..........
+ 
+-* Install ``git-remote-gcrypt`` by running the supplied ``install.sh`` script.
+-
+-* Create an encrypted remote by pushing to it::
++Create an encrypted remote by pushing to it::
+ 
+     git remote add cryptremote gcrypt::rsync://example.com:repo
+     git push cryptremote master
