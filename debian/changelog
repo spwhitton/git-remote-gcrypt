@@ -5,9 +5,9 @@ git-remote-gcrypt (1.0.0-1) UNRELEASED; urgency=medium
   * Remove notice about repository format potentially changing.
   * Implement gcrypt.gpg-args git config setting (Closes: #771011).
   * Respect git config gpg.program if configured.
-    Thanks Christian Amsüss.
+    Thanks Christian Amsüss.  (Closes: #827943)
   * Don't reset the remote ID when a gcrypt remote is not available.
-    Thanks Sebastian Reuße.
+    Thanks Sebastian Reuße.  (Closes: #827943)
 
   Debian packaging:
   * Drop patch containing changes by Joey Hess: incorporated in release.
