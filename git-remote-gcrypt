@@ -1,0 +1,909 @@
+#!/bin/sh
+#
+#  git-remote-gcrypt
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation, either version 3 of the License, or
+#  (at your option) version 2 or any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# See README.rst for usage instructions
+
+set -e # errexit
+set -f # noglob
+set -C # noclobber
+
+export GITCEPTION="${GITCEPTION:-}+" # Reuse $Gref except when stacked
+Gref="refs/gcrypt/gitception$GITCEPTION"
+Gref_rbranch="refs/heads/master"
+Packkey_bytes=63  # nbr random bytes for packfile keys, any >= 256 bit is ok
+Hashtype=SHA256   # SHA512 SHA384 SHA256 SHA224 supported.
+Manifestfile=91bd0c092128cf2e60e1a608c31e92caf1f9c1595f83f2890ef17c0e4881aa0a
+Hex40="[a-f0-9]"
+Hex40=$Hex40$Hex40$Hex40$Hex40$Hex40$Hex40$Hex40$Hex40
+Hex40=$Hex40$Hex40$Hex40$Hex40$Hex40 # Match SHA-1 hexdigest
+GPG="$(git config --get "gpg.program" '.+' || echo gpg)"
+
+Did_find_repo=  # yes for connected, no for no repo
+Localdir="${GIT_DIR:=.git}/remote-gcrypt"
+Tempdir=
+
+Repoid=
+Refslist=
+Packlist=
+Keeplist=
+Extnlist=
+Repack_limit=25
+
+Recipients=
+
+# compat/utility functions
+# xfeed: The most basic output function puts $1 into the stdin of $2..$#
+xfeed()
+{
+	local input_=
+	input_=$1; shift
+	"$@" <<EOF
+$input_
+EOF
+}
+xecho() { xfeed "$*" cat; }
+xecho_n() { xecho "$@" | tr -d \\n ; } # kill newlines
+echo_git() { xecho "$@" ; }  # Code clarity
+echo_info() { xecho "gcrypt:" "$@" >&2; }
+echo_die() { echo_info "$@" ; exit 1; }
+
+isnull() { case "$1" in "") return 0;; *) return 1;; esac; }
+isnonnull() { ! isnull "$1"; }
+iseq() { case "$1" in "$2") return 0;; *) return 1;; esac; }
+isnoteq() { ! iseq "$1" "$2"; }
+negate() { ! "$@"; }
+
+# Execute $@ or die
+pipefail()
+{
+	"$@" || { echo_info "'$1' failed!"; kill $$; exit 1; }
+}
+
+isurl() { isnull "${2%%$1://*}"; }
+islocalrepo() { isnull "${1##/*}" && [ ! -e "$1/HEAD" ]; }
+
+xgrep() { command grep "$@" || : ; }
+
+# setvar is used for named return variables
+# $1 *must* be a valid variable name, $2 is any value
+#
+# Conventions
+#   return variable names are passed with a @ prefix
+#   return variable functions use f_ prefix local vars
+#   return var consumers use r_ prefix vars (or Titlecase globals)
+setvar()
+{
+	isnull "${1##@*}" || echo_die "Missing @ for return variable: $1"
+	eval ${1#@}=\$2
+}
+
+Newline="
+"
+
+# $1 is return var, $2 is value appended with newline separator
+append_to()
+{
+	local f_append_tmp_=
+	eval f_append_tmp_=\$${1#@}
+	isnull "$f_append_tmp_" || f_append_tmp_=$f_append_tmp_$Newline
+	setvar "$1" "$f_append_tmp_$2"
+}
+
+# Pick words from each line
+# $1 return variable name
+# $2 input value
+pick_fields_1_2()
+{
+	local f_ret= f_one= f_two=
+	while read f_one f_two _ # from << here-document
+	do
+		f_ret="$f_ret$f_one $f_two$Newline"
+	done <<EOF
+$2
+EOF
+	setvar "$1" "${f_ret#$Newline}"
+}
+
+# Take all lines matching $2 (full line)
+# $1 return variable name
+# $2 filter word
+# $3 input value
+#  if $1 is a literal `!', the match is reversed (and arguments shift)
+#  we instead remove all lines matching
+filter_to()
+{
+	local f_neg= f_line= f_ret= IFS=
+	isnoteq "$1" "!" || { f_neg=negate; shift; }
+	IFS=$Newline
+	for f_line in $3
+	do
+		$f_neg isnonnull "${f_line##$2}" || f_ret=$f_ret$f_line$Newline
+	done
+	setvar "$1" "${f_ret%$Newline}"
+}
+
+# Output the number of lines in $1
+line_count()
+{
+	local IFS=
+	IFS=$Newline
+	set -- $1
+	xecho "$#"
+}
+
+
+## gitception part
+# Fetch giturl $1, file $2
+gitception_get()
+{
+	# Take care to preserve FETCH_HEAD
+	local ret_=: obj_id= fet_head="$GIT_DIR/FETCH_HEAD"
+	[ -e "$fet_head" ] && command mv -f "$fet_head" "$fet_head.$$~" || :
+	git fetch -q -f "$1" "$Gref_rbranch:$Gref" >/dev/null &&
+		obj_id="$(git ls-tree "$Gref" | xgrep -E '\b'"$2"'$' | awk '{print $3}')" &&
+		isnonnull "$obj_id" && git cat-file blob "$obj_id" && ret_=: ||
+		{ ret_=false && : ; }
+	[ -e "$fet_head.$$~" ] && command mv -f "$fet_head.$$~" "$fet_head" || :
+	$ret_
+}
+
+anon_commit()
+{
+	GIT_AUTHOR_NAME="root" GIT_AUTHOR_EMAIL="root@localhost" \
+	GIT_AUTHOR_DATE="1356994801 -0400" GIT_COMMITTER_NAME="root" \
+	GIT_COMMITTER_EMAIL="root@localhost" \
+	GIT_COMMITTER_DATE="1356994801 -0400" \
+		git commit-tree "$@" <<EOF
+Initial commit
+EOF
+}
+
+# Get 'tree' from $1, change file $2 to obj id $3
+update_tree()
+{
+	local tab_="	"
+	# $2 is a filename from the repo format
+	(set +e;
+		git ls-tree "$1" | xgrep -v -E '\b'"$2"'$';
+		xecho "100644 blob $3$tab_$2"
+	) | git mktree
+}
+
+# Put giturl $1, file $2
+# depends on previous GET to set $Gref and depends on PUT_FINAL later
+gitception_put()
+{
+	local obj_id= tree_id= commit_id=
+	obj_id=$(git hash-object -w --stdin) &&
+		tree_id=$(update_tree "$Gref" "$2" "$obj_id") &&
+		commit_id=$(anon_commit "$tree_id") &&
+		git update-ref "$Gref" "$commit_id"
+}
+
+# Remove giturl $1, file $2
+# depends on previous GET like put
+gitception_remove()
+{
+	local tree_id= commit_id= tab_="	"
+	# $2 is a filename from the repo format
+	tree_id=$(git ls-tree "$Gref" | xgrep -v -E '\b'"$2"'$' | git mktree) &&
+		commit_id=$(anon_commit "$tree_id") &&
+		git update-ref "$Gref" "$commit_id"
+}
+
+gitception_new_repo()
+{
+	local commit_id= empty_tree=4b825dc642cb6eb9a060e54bf8d69288fbee4904
+	# get any file to update Gref, and if it's not updated we create empty
+	git update-ref -d "$Gref" || :
+	gitception_get "$1" "x" 2>/dev/null >&2 || :
+	git rev-parse -q --verify "$Gref" >/dev/null && return 0 ||
+		commit_id=$(anon_commit "$empty_tree") &&
+		git update-ref "$Gref" "$commit_id"
+}
+## end gitception
+
+# Fetch repo $1, file $2, tmpfile in $3
+GET()
+{
+	if isurl sftp "$1"
+	then
+		(exec 0>&-; curl -s -S -k "$1/$2") > "$3"
+	elif isurl rsync "$1"
+	then
+		(exec 0>&-; rsync -I -W "${1#rsync://}"/"$2" "$3" >&2)
+	elif islocalrepo "$1"
+	then
+		cat "$1/$2" > "$3"
+	else
+		gitception_get "${1#gitception://}" "$2" > "$3"
+	fi
+}
+
+# Put repo $1, file $2 or fail, tmpfile in $3
+PUT()
+{
+	if isurl sftp "$1"
+	then
+		curl -s -S -k --ftp-create-dirs -T "$3" "$1/$2"
+	elif isurl rsync "$1"
+	then
+		rsync -I -W "$3" "${1#rsync://}"/"$2" >&2
+	elif islocalrepo "$1"
+	then
+		cat >| "$1/$2" < "$3"
+	else
+		gitception_put "${1#gitception://}" "$2" < "$3"
+	fi
+}
+
+# Put all PUT changes for repo $1 at once
+PUT_FINAL()
+{
+	if isurl sftp "$1" || islocalrepo "$1" || isurl rsync "$1"
+	then
+		:
+	else
+		git push --quiet -f "${1#gitception://}" "$Gref:$Gref_rbranch"
+	fi
+}
+
+# Put directory for repo $1
+PUTREPO()
+{
+	if isurl sftp "$1"
+	then
+		:
+	elif isurl rsync "$1"
+	then
+		rsync -q -r --exclude='*' "$Localdir/" "${1#rsync://}" >&2
+	elif islocalrepo "$1"
+	then
+		mkdir -p "$1"
+	else
+		gitception_new_repo "${1#gitception://}"
+	fi
+}
+
+# For repo $1, delete all newline-separated files in $2
+REMOVE()
+{
+	local fn_=
+	if isurl sftp "$1"
+	then
+		# FIXME
+		echo_info "sftp: Ignore remove request $1/$2"
+	elif isurl rsync "$1"
+	then
+		xfeed "$2" rsync -I -W -v -r --delete --include-from=- \
+			--exclude='*' "$Localdir"/ "${1#rsync://}/" >&2
+	elif islocalrepo "$1"
+	then
+		for fn_ in $2; do
+			rm -f "$1"/"$fn_"
+		done
+	else
+		for fn_ in $2; do
+			gitception_remove "${1#gitception://}" "$fn_"
+		done
+	fi
+}
+
+CLEAN_FINAL()
+{
+	if isurl sftp "$1" || islocalrepo "$1" || isurl rsync "$1"
+	then
+		:
+	else
+		git update-ref -d "$Gref" || :
+	fi
+}
+
+ENCRYPT()
+{
+	rungpg --batch --force-mdc --compress-algo none --trust-model=always --passphrase-fd 3 -c 3<<EOF
+$1
+EOF
+}
+
+DECRYPT()
+{
+	rungpg -q --batch --no-default-keyring --secret-keyring /dev/null \
+		--keyring /dev/null --passphrase-fd 3 -d  3<<EOF
+$1
+EOF
+}
+
+# Encrypt to recipients $1
+PRIVENCRYPT()
+{
+	set -- $1
+	if isnonnull "$Conf_signkey"; then
+		set -- "$@" -u "$Conf_signkey"
+	fi
+	rungpg --compress-algo none --trust-model=always -se "$@"
+}
+
+# $1 is the match for good signature, $2 is the textual signers list
+PRIVDECRYPT()
+{
+	local status_=
+	exec 4>&1 &&
+	status_=$(rungpg --status-fd 3 -q -d 3>&1 1>&4) &&
+	xfeed "$status_" grep "^\[GNUPG:\] ENC_TO " >/dev/null &&
+	(xfeed "$status_" grep -e "$1" >/dev/null || {
+		echo_info "Failed to verify manifest signature!" &&
+		echo_info "Only accepting signatories: ${2:-(none)}" &&
+		return 1
+	})
+}
+
+# Generate $1 random bytes
+genkey()
+{
+	rungpg --armor --gen-rand 1 "$1"
+}
+
+gpg_hash()
+{
+	local hash_=
+	hash_=$(rungpg --with-colons --print-md "$1" | tr A-F a-f)
+	hash_=${hash_#:*:}
+	xecho "${hash_%:}"
+}
+
+rungpg()
+{
+	if isnonnull "$Conf_gpg_args"; then
+		set -- "$Conf_gpg_args" "$@"
+	fi
+	# gpg will fail to run when there is no controlling tty,
+	# due to trying to print messages to it, even if a gpg agent is set
+	# up. --no-tty fixes this.
+	if [ "x$GPG_AGENT_INFO" != "x" ]; then
+		${GPG} --no-tty "$@"
+	else
+		${GPG} "$@"
+	fi
+}
+
+# Pass the branch/ref by pipe to git
+safe_git_rev_parse()
+{
+	git cat-file --batch-check 2>/dev/null |
+		xgrep -v "missing" | cut -f 1 -d ' '
+}
+
+make_new_repo()
+{
+	echo_info "Setting up new repository"
+	PUTREPO "$URL"
+
+	# Needed assumption: the same user should have no duplicate Repoid
+	Repoid=":id:$(genkey 15)"
+	iseq "${NAME#gcrypt::}" "$URL" ||
+		git config "remote.$NAME.gcrypt-id" "$Repoid"
+	echo_info "Remote ID is $Repoid"
+	Extnlist="extn comment"
+}
+
+
+# $1 return var for goodsig match, $2 return var for signers text
+read_config()
+{
+	local recp_= r_tail= r_keyinfo= r_keyfpr= gpg_list= cap_= conf_part= good_sig= signers_=
+	Conf_signkey=$(git config --get "remote.$NAME.gcrypt-signingkey" '.+' ||
+		git config --path user.signingkey || :)
+	conf_part=$(git config --get "remote.$NAME.gcrypt-participants" '.+' ||
+		    git config --get gcrypt.participants '.+' || :)
+	Conf_pubish_participants=$(git config --get --bool "remote.$NAME.gcrypt-publish-participants" '.+' ||
+		git config --get --bool gcrypt.publish-participants || :)
+	Conf_gpg_args=$(git config --get gcrypt.gpg-args '.+' || :)
+
+	# Figure out which keys we should encrypt to or accept signatures from
+	if isnull "$conf_part" || iseq "$conf_part" simple
+	then
+		signers_="(default keyring)"
+		Recipients="--throw-keyids --default-recipient-self"
+		good_sig="^\[GNUPG:\] GOODSIG "
+		setvar "$1" "$good_sig"
+		setvar "$2" "$signers_"
+		return 0
+	fi
+
+	for recp_ in $conf_part
+	do
+		gpg_list=$(rungpg --with-colons --fingerprint -k "$recp_")
+		r_tail_=$(echo "$recp_" | sed -e 's/^0x//')
+		filter_to @r_keyinfo "pub*" "$gpg_list"
+		if echo "$recp_" | grep -E -q '^[xA-F0-9]+$'; then # is $recp_ a keyid?
+			filter_to @r_keyfpr "fpr*$r_tail_*" "$gpg_list"
+		else
+			filter_to @r_keyfpr "fpr*" "$gpg_list"
+		fi
+		isnull "$r_keyinfo" || isnonnull "${r_keyinfo##*"$Newline"*}" ||
+		echo_info "WARNING: '$recp_' matches multiple keys, using one"
+		isnull "$r_keyfpr" || isnonnull "${r_keyfpr##*"$Newline"*}" ||
+		echo_info "WARNING: '$recp_' matches multiple fingerprints, using one"
+		r_keyinfo=${r_keyinfo%%"$Newline"*}
+		r_keyfpr=${r_keyfpr%%"$Newline"*}
+		keyid_=$(xfeed "$r_keyinfo" cut -f 5 -d :)
+		fprid_=$(xfeed "$r_keyfpr" cut -f 10 -d :)
+
+		isnonnull "$fprid_" &&
+		signers_="$signers_ $keyid_" &&
+		append_to @good_sig "^\[GNUPG:\] VALIDSIG .*$fprid_$" || {
+			echo_info "WARNING: Skipping missing key $recp_"
+			continue
+		}
+		# Check 'E'ncrypt capability
+		cap_=$(xfeed "$r_keyinfo" cut -f 12 -d :)
+		if ! iseq "${cap_#*E}" "$cap_"; then
+			if [ "$Conf_pubish_participants" = true ]; then
+				Recipients="$Recipients -r $keyid_"
+			else
+				Recipients="$Recipients -R $keyid_"
+			fi
+		fi
+	done
+
+	if isnull "$Recipients"
+	then
+		echo_info "You have not configured any keys you can encrypt to" \
+			"for this repository"
+		echo_info "Use ::"
+		echo_info "  git config gcrypt.participants YOURKEYID"
+		exit 1
+	fi
+	setvar "$1" "$good_sig"
+	setvar "$2" "$signers_"
+}
+
+ensure_connected()
+{
+	local manifest_= r_repoid= r_name= url_frag= r_sigmatch= r_signers= \
+		tmp_manifest=
+
+	if isnonnull "$Did_find_repo"
+	then
+		return
+	fi
+	Did_find_repo=no
+	read_config @r_sigmatch @r_signers
+
+	iseq "${NAME#gcrypt::}" "$URL" || r_name=$NAME
+
+	if isurl gitception "$URL" && isnonnull "$r_name"; then
+		git config "remote.$r_name.url" "gcrypt::${URL#gitception://}"
+		echo_info "Updated URL for $r_name, gitception:// -> ()"
+	fi
+
+	# Find the URL fragment
+	url_frag=${URL##*"#"}
+	isnoteq "$url_frag" "$URL" || url_frag=
+	URL=${URL%"#$url_frag"}
+
+	# manifestfile -- sha224 hash if we can, else the default location
+	if isurl sftp "$URL" || islocalrepo "$URL" || isurl rsync "$URL"
+	then
+		# not for gitception
+		isnull "$url_frag" ||
+			Manifestfile=$(xecho_n "$url_frag" | gpg_hash SHA224)
+	else
+		isnull "$url_frag" || Gref_rbranch="refs/heads/$url_frag"
+	fi
+
+	Repoid=
+	isnull "$r_name" ||
+		Repoid=$(git config "remote.$r_name.gcrypt-id" || :)
+
+
+	tmp_manifest="$Tempdir/maniF"
+	GET "$URL" "$Manifestfile" "$tmp_manifest" 2>/dev/null || {
+		echo_info "Repository not found: $URL"
+		if ! isnull "$Repoid"; then
+			echo_info "..but repository ID is set. Aborting."
+			return 1
+		else
+			return 0
+		fi
+	}
+
+	Did_find_repo=yes
+	echo_info "Decrypting manifest"
+	manifest_=$(PRIVDECRYPT "$r_sigmatch" "$r_signers" < "$tmp_manifest") &&
+		isnonnull "$manifest_" ||
+		echo_die "Failed to decrypt manifest!"
+	rm -f "$tmp_manifest"
+
+	filter_to @Refslist "$Hex40 *" "$manifest_"
+	filter_to @Packlist "pack :*:* *" "$manifest_"
+	filter_to @Keeplist "keep :*:*" "$manifest_"
+	filter_to @Extnlist "extn *" "$manifest_"
+	filter_to @r_repoid "repo *" "$manifest_"
+
+	r_repoid=${r_repoid#repo }
+	r_repoid=${r_repoid% *}
+	if isnull "$Repoid"
+	then
+		echo_info "Remote ID is $r_repoid"
+		Repoid=$r_repoid
+	elif isnoteq "$r_repoid" "$Repoid"
+	then
+		echo_info "WARNING:"
+		echo_info "WARNING: Remote ID has changed!"
+		echo_info "WARNING: from $Repoid"
+		echo_info "WARNING: to   $r_repoid"
+		echo_info "WARNING:"
+		Repoid=$r_repoid
+	else
+		return 0
+	fi
+
+	isnull "$r_name" || git config "remote.$r_name.gcrypt-id" "$r_repoid"
+}
+
+# $1 is the hash type (SHA256 etc)
+# $2 the pack id
+# $3 the key
+get_verify_decrypt_pack()
+{
+	local rcv_id= tmp_encrypted=
+	tmp_encrypted="$Tempdir/packF"
+	GET "$URL" "$2" "$tmp_encrypted" &&
+	rcv_id=$(gpg_hash "$1" < "$tmp_encrypted") &&
+	iseq "$rcv_id" "$2" || echo_die "Packfile $2 does not match digest!"
+	DECRYPT "$3" < "$tmp_encrypted"
+	rm -f "$tmp_encrypted"
+}
+
+# download all packlines (pack :SHA256:a32abc1231) from stdin (or die)
+# $1 destdir (when repack, else "")
+get_pack_files()
+{
+	local pack_id= r_pack_key_line= htype_= pack_= key_=
+	while IFS=': ' read -r _ htype_ pack_ # <<here-document
+	do
+		isnonnull "$pack_" || continue
+
+		# Get the Packlist line with the key
+		pack_id=":${htype_}:$pack_"
+		filter_to @r_pack_key_line "pack $pack_id *" "$Packlist"
+		key_=${r_pack_key_line#pack $pack_id }
+
+		if isnonnull "${pack_##$Hex40*}" ||
+			isnoteq "$htype_" SHA256 && isnoteq "$htype_" SHA224 &&
+			isnoteq "$htype_" SHA384 && isnoteq "$htype_" SHA512
+		then
+			echo_die "Packline malformed: $pack_id"
+		fi
+
+		get_verify_decrypt_pack "$htype_" "$pack_" "$key_" | \
+		if isnull "${1:-}"
+		then
+			# add to local pack list
+			git index-pack -v --stdin >/dev/null
+			xecho "pack $pack_id" >> "$Localdir/have_packs$GITCEPTION"
+		else
+			git index-pack -v --stdin "$1/${pack_}.pack" >/dev/null
+		fi
+	done
+}
+
+# Download and unpack remote packfiles
+# $1 return var for list of packfiles to delete
+repack_if_needed()
+{
+	local n_= m_= kline_= r_line= r_keep_packlist= r_del_list=
+
+	isnonnull "$Packlist" || return 0
+
+	if isnonnull "${GCRYPT_FULL_REPACK:-}"
+	then
+		Keeplist=
+		Repack_limit=0
+	fi
+
+	pick_fields_1_2 @r_del_list "$Packlist"
+
+	n_=$(line_count "$Packlist")
+	m_=$(line_count "$Keeplist")
+	if iseq 0 "$(( $Repack_limit < ($n_ - $m_) ))"; then
+		return
+	fi
+	echo_info "Repacking remote $NAME, ..."
+
+	mkdir "$Tempdir/pack"
+
+	# Split packages to keep and to repack
+	if isnonnull "$Keeplist"; then
+		while read -r _ kline_ _ # <<here-document
+		do
+			isnonnull "$kline_" || continue
+			filter_to @r_line "pack $kline_ *" "$Packlist"
+			append_to @r_keep_packlist "$r_line"
+			filter_to ! @r_del_list "pack $kline_" "$r_del_list"
+		done <<EOF
+$Keeplist
+EOF
+	fi
+
+	xfeed "$r_del_list" get_pack_files "$Tempdir/pack/"
+
+	(set +f; pipefail git verify-pack -v "$Tempdir"/pack/*.idx) |
+		grep -E '^[0-9a-f]{40}' | cut -f 1 -d ' '
+
+	Packlist=$r_keep_packlist
+	setvar "$1" "$r_del_list"
+}
+
+do_capabilities()
+{
+	echo_git fetch
+	echo_git push
+	echo_git
+}
+
+do_list()
+{
+	local obj_id= ref_name= line_=
+	ensure_connected
+
+	xecho "$Refslist" | while read line_
+	do
+		isnonnull "$line_" || break
+		obj_id=${line_%% *}
+		ref_name=${line_##* }
+		echo_git "$obj_id" "$ref_name"
+		if iseq "$ref_name" "refs/heads/master"
+		then
+			echo_git "@refs/heads/master HEAD"
+		fi
+	done
+
+	# end with blank line
+	echo_git
+}
+
+do_fetch()
+{
+	# Download packs in the manifest that don't appear in have_packs
+	local pneed_= premote_=
+
+	ensure_connected
+
+	# The `+` for $GITCEPTION is pointless but we will be safe for stacking
+	pick_fields_1_2 @premote_ "$Packlist"
+	if [ -s "$Localdir/have_packs+" ]
+	then
+		pneed_=$(xfeed "$premote_" xgrep -v -x -f "$Localdir/have_packs+")
+	else
+		pneed_=$premote_
+	fi
+
+	xfeed "$pneed_" get_pack_files
+
+	echo_git # end with blank line
+}
+
+# do_push PUSHARGS (multiple lines like +src:dst, with both + and src opt.)
+do_push()
+{
+	# Security protocol:
+	# Each git packfile is encrypted and then named for the encrypted
+	# file's hash. The manifest is updated with the pack id.
+	# The manifest is encrypted.
+	local r_revlist= pack_id= key_= obj_= src_= dst_= \
+		r_pack_delete= tmp_encrypted= tmp_objlist= tmp_manifest=
+
+	ensure_connected
+
+	if iseq "$Did_find_repo" "no"
+	then
+		make_new_repo
+	fi
+
+	if isnonnull "$Refslist"
+	then
+		# mark all remote refs with  ^<sha-1> (if sha-1 exists locally)
+		r_revlist=$(xfeed "$Refslist" cut -f 1 -d ' ' |
+			safe_git_rev_parse | sed -e 's/^\(.\)/^&/')
+	fi
+
+	while IFS=: read -r src_ dst_ # << +src:dst
+	do
+		src_=${src_#+}
+		filter_to ! @Refslist "$Hex40 $dst_" "$Refslist"
+
+		if isnonnull "$src_"
+		then
+			append_to @r_revlist "$src_"
+			obj_=$(xfeed "$src_" safe_git_rev_parse)
+			append_to @Refslist "$obj_ $dst_"
+		fi
+	done <<EOF
+$1
+EOF
+
+	tmp_encrypted="$Tempdir/packP"
+	tmp_objlist="$Tempdir/objlP"
+
+	{
+		xfeed "$r_revlist" git rev-list --objects --stdin --
+		repack_if_needed @r_pack_delete
+	} > "$tmp_objlist"
+
+	# Only send pack if we have any objects to send
+	if [ -s "$tmp_objlist" ]
+	then
+		key_=$(genkey "$Packkey_bytes")
+		pack_id=$(export GIT_ALTERNATE_OBJECT_DIRECTORIES=$Tempdir;
+			pipefail git pack-objects --stdout < "$tmp_objlist" |
+			pipefail ENCRYPT "$key_" |
+			tee "$tmp_encrypted" | gpg_hash "$Hashtype")
+
+		append_to @Packlist "pack :${Hashtype}:$pack_id $key_"
+		if isnonnull "$r_pack_delete"
+		then
+			append_to @Keeplist "keep :${Hashtype}:$pack_id 1"
+		fi
+	fi
+
+	# Generate manifest
+	echo_info "Encrypting to: $Recipients"
+	echo_info "Requesting manifest signature"
+
+	tmp_manifest="$Tempdir/maniP"
+	PRIVENCRYPT "$Recipients" > "$tmp_manifest" <<EOF
+$Refslist
+$Packlist
+$Keeplist
+repo $Repoid
+$Extnlist
+EOF
+
+	# Upload pack
+	if [ -s "$tmp_objlist" ]
+	then
+		PUT "$URL" "$pack_id" "$tmp_encrypted"
+	fi
+
+	# Upload manifest
+	PUT "$URL" "$Manifestfile" "$tmp_manifest"
+
+	rm -f "$tmp_encrypted"
+	rm -f "$tmp_objlist"
+	rm -f "$tmp_manifest"
+
+	# Delete packs
+	if isnonnull "$r_pack_delete"; then
+		REMOVE "$URL" "$(xecho "$r_pack_delete" | \
+			while IFS=': ' read -r _ _ pack_
+			do
+				isnonnull "$pack_" || continue
+				xecho "$pack_"
+			done)"
+	fi
+
+	PUT_FINAL "$URL"
+
+	# ok all updates
+	while IFS=: read -r src_ dst_ # << +src:dst
+	do
+		echo_git "ok $dst_"
+	done <<EOF
+$1
+EOF
+	
+	echo_git 
+}
+
+cleanup_tmpfiles()
+{
+	if isnonnull "${Tempdir%%*."$$"}"; then
+		echo_die "Unexpected Tempdir value: $Tempdir"
+	fi
+	rm -r -f -- "${Tempdir}" >&2
+}
+
+setup()
+{
+	mkdir -p "$Localdir"
+
+	# Set up a subdirectory in /tmp
+	temp_key=$(genkey 9 | tr '/' _)
+	Tempdir="${TMPDIR:-/tmp}/git-remote-gcrypt-${temp_key}.$$"
+	mkdir -m 700 "${Tempdir}"
+
+	trap cleanup_tmpfiles EXIT
+	trap 'exit 1' 1 2 3 15
+}
+
+# handle git-remote-helpers protocol
+gcrypt_main_loop()
+{
+	local input_= input_inner= r_args= temp_key=
+
+	NAME=$1  # Remote name
+	URL=$2   # Remote URL
+
+	setup
+
+	while read input_
+	do
+		case "$input_" in
+		capabilities)
+			do_capabilities
+			;;
+		list|list\ for-push)
+			do_list
+			;;
+		fetch\ *)
+			r_args=${input_##fetch }
+			while read input_inner
+			do
+				case "$input_inner" in
+				fetch*)
+				r_args= #ignored
+				;;
+				*)
+				break
+				;;
+				esac
+			done
+			do_fetch "$r_args"
+			;;
+		push\ *)
+			r_args=${input_##push }
+			while read input_inner
+			do
+				case "$input_inner" in
+				push\ *)
+					append_to @r_args "${input_inner#push }"
+				;;
+				*)
+					break
+				;;
+				esac
+			done
+			do_push "$r_args"
+			;;
+		?*)
+			echo_die "Unknown input!"
+			;;
+		*)
+			CLEAN_FINAL "$URL"
+			exit 0
+			;;
+		esac
+	done
+}
+
+if [ "x$1" = x--check ]
+then
+	NAME=dummy-gcrypt-check
+	URL=$2
+	setup
+	ensure_connected
+	git remote remove $NAME 2>/dev/null || true
+	if iseq "$Did_find_repo" "no"
+	then
+		exit 100
+	fi
+else
+	gcrypt_main_loop "$@"
+fi
