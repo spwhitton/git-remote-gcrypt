@@ -368,13 +368,16 @@ gpg_hash()
 
 rungpg()
 {
+	if isnonnull "$Conf_gpg_args"; then
+		set -- "$Conf_gpg_args" "$@"
+	fi
 	# gpg will fail to run when there is no controlling tty,
 	# due to trying to print messages to it, even if a gpg agent is set
 	# up. --no-tty fixes this.
 	if [ "x$GPG_AGENT_INFO" != "x" ]; then
-		${GPG} --no-tty "${Conf_gpg_args:-}" "$@"
+		${GPG} --no-tty "$@"
 	else
-		${GPG} "${Conf_gpg_args:-}" "$@"
+		${GPG} "$@"
 	fi
 }
 
