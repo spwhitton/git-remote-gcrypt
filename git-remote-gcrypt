@@ -372,9 +372,9 @@ rungpg()
 	# due to trying to print messages to it, even if a gpg agent is set
 	# up. --no-tty fixes this.
 	if [ "x$GPG_AGENT_INFO" != "x" ]; then
-		${GPG} --no-tty "${GCRYPT_GPG_ARGS:-}" "$@"
+		${GPG} --no-tty "${Conf_gpg_args:-}" "$@"
 	else
-		${GPG} "${GCRYPT_GPG_ARGS:-}" "$@"
+		${GPG} "${Conf_gpg_args:-}" "$@"
 	fi
 }
 
@@ -409,6 +409,7 @@ read_config()
 		    git config --get gcrypt.participants '.+' || :)
 	Conf_pubish_participants=$(git config --get --bool "remote.$NAME.gcrypt-publish-participants" '.+' ||
 		git config --get --bool gcrypt.publish-participants || :)
+	Conf_gpg_args=$(git config --get gcrypt.gpg-args '.+' || :)
 
 	# Figure out which keys we should encrypt to or accept signatures from
 	if isnull "$conf_part" || iseq "$conf_part" simple

@@ -77,16 +77,15 @@ The following ``git-config(1)`` variables are supported:
     part of the participant list. You may use the per-remote version
     to sign different remotes using different keys.
 
+``gcrypt.gpg-args``
+    The contents of this setting are passed as arguments to gpg.
+    E.g. ``--use-agent``.
 
 Environment Variables
 =====================
 
 *GCRYPT_FULL_REPACK*
     This environment variable forces full repack when pushing.
-
-*GCRYPT_GPG_ARGS*
-    The contents of this environment variable are passed as arguments
-    to gpg.  E.g. ``export GCRYPT_GPG_ARGS="--use-agent"``.
 
 Examples
 ========
