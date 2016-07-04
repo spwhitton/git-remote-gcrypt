@@ -87,6 +87,17 @@ Environment Variables
 *GCRYPT_FULL_REPACK*
     This environment variable forces full repack when pushing.
 
+Note to users of GnuPG version 2
+================================
+
+When a repository was pushed with ``gcrypt.publish-participants``
+false (i.e. the recipient is anonymous), and you are using GnuPG
+version 2, you will need to include ``--try-all-secrets`` or
+``--try-secret-key ID`` in ``gcrypt.gpg-args``.
+
+GnuPG version 1 always tries all available secret keys when it
+encounters a message with an anonymous recipient.
+
 Examples
 ========
 

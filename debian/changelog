@@ -11,6 +11,7 @@ git-remote-gcrypt (1.0.0-1) UNRELEASED; urgency=medium
   * Suppress bogus warning about keyid matching multiple fingerprints.
     Based on work by Raphaël Droz.
     Closes https://github.com/joeyh/git-remote-gcrypt/pull/2
+  * Add "Note to users of GnuPG version 2" section to README.rst.
 
   Debian packaging:
   * Drop patch containing changes by Joey Hess: incorporated in release.
