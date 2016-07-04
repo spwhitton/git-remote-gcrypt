@@ -1,4 +1,4 @@
-git-remote-gcrypt (1.0.0-1) UNRELEASED; urgency=medium
+git-remote-gcrypt (1.0.0-1) unstable; urgency=medium
 
   Upstream:
   * Taking over as upstream maintainer.
@@ -24,7 +24,7 @@ git-remote-gcrypt (1.0.0-1) UNRELEASED; urgency=medium
   * Add a comment to d/source/lintian-overrides.
   * Bump standards version to 3.9.8 (no changes required).
 
- -- Sean Whitton <spwhitton@spwhitton.name>  Sun, 17 Jan 2016 19:12:42 -0700
+ -- Sean Whitton <spwhitton@spwhitton.name>  Mon, 04 Jul 2016 19:18:48 +0900
 
 git-remote-gcrypt (0.20130908-8) unstable; urgency=medium
 
