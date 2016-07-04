@@ -22,6 +22,7 @@ git-remote-gcrypt (1.0.0-1) UNRELEASED; urgency=medium
   * Drop Lintian override of no-upstream-changelog.
   * Update URIs in old changelog entries.
   * Add a comment to d/source/lintian-overrides.
+  * Bump standards version to 3.9.8 (no changes required).
 
  -- Sean Whitton <spwhitton@spwhitton.name>  Sun, 17 Jan 2016 19:12:42 -0700
 

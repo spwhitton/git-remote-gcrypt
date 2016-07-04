@@ -3,7 +3,7 @@ Section: vcs
 Priority: optional
 Build-Depends: debhelper (>= 9), python-docutils (>= 0.12+dfsg)
 Maintainer: Sean Whitton <spwhitton@spwhitton.name>
-Standards-Version: 3.9.6
+Standards-Version: 3.9.8
 Homepage: https://github.com/bluss/git-remote-gcrypt
 Vcs-Git: https://git.spwhitton.name/git-remote-gcrypt
 Vcs-Browser: https://git.spwhitton.name/?p=git-remote-gcrypt.git;a=summary
