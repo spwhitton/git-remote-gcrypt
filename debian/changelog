@@ -1,4 +1,7 @@
-git-remote-gcrypt (1.0.1-1) UNRELEASED; urgency=medium
+git-remote-gcrypt (1.0.1-1) UNRELEASED; urgency=low
+
+  Upstream:
+  * Add authorship details to script header.
 
   Debian packaging:
   * Update Homepage: to point to my website.
