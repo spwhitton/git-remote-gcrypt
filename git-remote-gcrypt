@@ -353,17 +353,13 @@ CLEAN_FINAL()
 
 ENCRYPT()
 {
-	rungpg --batch --yes --force-mdc --compress-algo none --trust-model=always --passphrase-fd 3 -c 3<<EOF
-$1
-EOF
+	rungpg --batch --force-mdc --compress-algo none --trust-model=always --passphrase "$1" -c
 }
 
 DECRYPT()
 {
-	rungpg -q --batch --yes --no-default-keyring --secret-keyring /dev/null \
-		--keyring /dev/null --passphrase-fd 3 -d  3<<EOF
-$1
-EOF
+	rungpg -q --batch --no-default-keyring --secret-keyring /dev/null \
+		--keyring /dev/null --passphrase "$1"
 }
 
 # Encrypt to recipients $1
@@ -379,9 +375,12 @@ PRIVENCRYPT()
 # $1 is the match for good signature, $2 is the textual signers list
 PRIVDECRYPT()
 {
+	tmp_status_file="${Tempdir}/status"
+	tmp_status_file_windows="$(cygpath -w "${tmp_status_file}")"
 	local status_=
-	exec 4>&1 &&
-	status_=$(rungpg --status-fd 3 -q -d 3>&1 1>&4) &&
+	rungpg --status-file "$tmp_status_file_windows" -q -d &&
+	sed -i 's/\r//' "$tmp_status_file" &&
+	status_=`cat $tmp_status_file` &&
 	xfeed "$status_" grep "^\[GNUPG:\] ENC_TO " >/dev/null &&
 	(xfeed "$status_" grep -e "$1" >/dev/null || {
 		echo_info "Failed to verify manifest signature!" &&
