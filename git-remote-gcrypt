@@ -831,7 +831,15 @@ setup()
 	# Set up a subdirectory in /tmp
 	temp_key=$(genkey 9 | tr '/' _)
 	Tempdir="${TMPDIR:-/tmp}/git-remote-gcrypt-${temp_key}.$$"
-	mkdir -m 700 "${Tempdir}"
+	case "${MSYSTEM:-unknown}" in
+	MSYS*|MINGW*)
+		mkdir "${Tempdir}"
+		echo_info "Warning: Not securing tempdir ${Tempdir} because we are on mingw/msys"
+		;;
+	unknown|*)
+		mkdir -m 700 "${Tempdir}"
+		;;
+	esac
 
 	trap cleanup_tmpfiles EXIT
 	trap 'exit 1' 1 2 3 15
