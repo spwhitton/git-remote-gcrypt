@@ -6,6 +6,7 @@ git-remote-gcrypt (1.0.1-1) UNRELEASED; urgency=low
   Debian packaging:
   * Update Homepage: to point to my website.
   * Bump debhelper build-dep & compat to 10.
+  * Use shorter URI in Vcs-Browser.
 
  -- Sean Whitton <spwhitton@spwhitton.name>  Tue, 05 Jul 2016 04:49:57 +0000
 
