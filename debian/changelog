@@ -1,4 +1,4 @@
-git-remote-gcrypt (1.0.1-1) UNRELEASED; urgency=low
+git-remote-gcrypt (1.0.1-1) unstable; urgency=low
 
   Upstream:
   * Add authorship details to script header.
@@ -8,7 +8,7 @@ git-remote-gcrypt (1.0.1-1) UNRELEASED; urgency=low
   * Bump debhelper build-dep & compat to 10.
   * Use shorter URI in Vcs-Browser.
 
- -- Sean Whitton <spwhitton@spwhitton.name>  Tue, 05 Jul 2016 04:49:57 +0000
+ -- Sean Whitton <spwhitton@spwhitton.name>  Tue, 10 Jan 2017 20:17:08 -0700
 
 git-remote-gcrypt (1.0.0-1) unstable; urgency=medium
 
