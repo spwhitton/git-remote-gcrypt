@@ -228,10 +228,11 @@ git-remote-helpers(1), gpg(1)
 Credits
 =======
 
-The original author of git-remote-gcrypt is GitHub user bluss.
+The original author of git-remote-gcrypt was GitHub user bluss.
 
-The de facto maintainer in 2013 and 2014 was Joey Hess.  The current
-maintainer is Sean Whitton <spwhitton@spwhitton.name>.
+The de facto maintainer in 2013 and 2014 was Joey Hess.
+
+The current maintainer is Sean Whitton <spwhitton@spwhitton.name>.
 
 License
 =======
