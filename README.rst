@@ -143,10 +143,10 @@ Remote ID
 Performance
     Using an arbitrary `<giturl>` requires uploading the entire
     repository history with each push.  If your repository history is
-    large and git-remote-gcrypt is slow, consider using either the
-    `rsync://` or `sftp://` transports, which perform incremental
-    pushes.  Note that this won't work with a repository hosting
-    service like GitHub.
+    large or you are pushing over a slow link, consider using either
+    the `rsync://` or `sftp://` transports, which perform incremental
+    pushes.  Note that the latter won't work with a repository hosting
+    service like gitolite, GitHub or GitLab.
 
 Repository Format
 .................
