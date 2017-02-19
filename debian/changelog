@@ -1,4 +1,4 @@
-git-remote-gcrypt (1.0.2-1) UNRELEASED; urgency=medium
+git-remote-gcrypt (1.0.2) UNRELEASED; urgency=medium
 
   Documentation:
   * Add a note about performance when pushing to arbitrary git URLs.
@@ -6,6 +6,8 @@ git-remote-gcrypt (1.0.2-1) UNRELEASED; urgency=medium
   * Add `apt-get` installation instructions, for the benefit of GitHub users.
   * Other minor edits and formatting changes.
 
+  Debian packaging:
+  * Switch to source format 3.0 (native).
  -- Sean Whitton <spwhitton@spwhitton.name>  Sun, 19 Feb 2017 07:42:05 -0700
 
 git-remote-gcrypt (1.0.1-1) unstable; urgency=low
