@@ -68,6 +68,10 @@ The following ``git-config(1)`` variables are supported:
     available secret key in turn until it finds a usable key.
     This can result in unncessary passphrase prompts.
 
+``gcrypt.gpg-args``
+    The contents of this setting are passed as arguments to gpg.
+    E.g. ``--use-agent``.
+
 ``remote.<name>.gcrypt-signingkey``
     ..
 ``user.signingkey``
@@ -75,10 +79,6 @@ The following ``git-config(1)`` variables are supported:
     You should set ``user.signingkey`` if your default signing key is not
     part of the participant list. You may use the per-remote version
     to sign different remotes using different keys.
-
-``gcrypt.gpg-args``
-    The contents of this setting are passed as arguments to gpg.
-    E.g. ``--use-agent``.
 
 Environment Variables
 =====================
