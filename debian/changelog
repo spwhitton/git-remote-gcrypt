@@ -10,6 +10,9 @@ git-remote-gcrypt (1.0.2) UNRELEASED; urgency=medium
   * Switch to source format 3.0 (native).
     - Override Lintian tag latest-debian-changelog-entry-changed-to-native.
     - Drop override of Lintian tag debian-watch-file-is-missing.
+  * Add code to d/rules to remove installation instructions from the manpage.
+    This replaces the old quilt patch.
+
  -- Sean Whitton <spwhitton@spwhitton.name>  Sun, 19 Feb 2017 07:42:05 -0700
 
 git-remote-gcrypt (1.0.1-1) unstable; urgency=low

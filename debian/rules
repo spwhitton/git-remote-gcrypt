@@ -1,4 +1,7 @@
 #!/usr/bin/make -f
+
+manpage = debian/git-remote-gcrypt/usr/share/man/man1/git-remote-gcrypt.1
+
 %:
 	dh $@
 
@@ -9,3 +12,9 @@ override_dh_auto_clean:
 
 override_dh_auto_install:
 	prefix=/usr DESTDIR=debian/git-remote-gcrypt ./install.sh
+	# remove installation instructions from manpage (this is
+	# essentially an automatically-refreshing quilt patch)
+	gunzip ${manpage}.gz
+	sed -i ${manpage} -e \
+		'/^.SS Installation$$/,/^.SS/{ /^.SS Installation$$/d; /^.SS/!d }'
+	gzip -n ${manpage}
