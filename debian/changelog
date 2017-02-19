@@ -2,6 +2,7 @@ git-remote-gcrypt (1.0.2-1) UNRELEASED; urgency=medium
 
   Documentation:
   * Add a note about performance when pushing to arbitrary git URLs.
+  * Add section containing author and maintainer information.
 
  -- Sean Whitton <spwhitton@spwhitton.name>  Sun, 19 Feb 2017 07:42:05 -0700
 
