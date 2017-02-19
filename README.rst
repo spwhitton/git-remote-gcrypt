@@ -23,16 +23,17 @@ over arbitrary git transport.
 The aim is to provide confidential, authenticated git storage and
 collaboration using typical untrusted file hosts or services.
 
+Installation
+............
+
+* ``apt-get install git-remote-gcrypt`` on Debian and Ubuntu systems
+
+* or run the supplied ``install.sh`` script on other systems.
+
 Quickstart
 ..........
 
-* Install ``git-remote-gcrypt``::
-
-    * ``apt-get install git-remote-gcrypt`` on Debian and Ubuntu systems
-
-    * by running the supplied ``install.sh`` script on other systems.
-
-* Create an encrypted remote by pushing to it::
+Create an encrypted remote by pushing to it::
 
     git remote add cryptremote gcrypt::rsync://example.com:repo
     git push cryptremote master
