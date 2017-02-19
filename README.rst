@@ -66,12 +66,12 @@ The following ``git-config(1)`` variables are supported:
     ..
 ``gcrypt.publish-participants``
     By default, the gpg key ids of the participants are obscured by
-    encrypting using `gpg -R`. Setting this option to `true` disables
+    encrypting using ``gpg -R``. Setting this option to ``true`` disables
     that security measure.
 
-    The problem with using `gpg -R` is that to decrypt, gpg tries each
+    The problem with using ``gpg -R`` is that to decrypt, gpg tries each
     available secret key in turn until it finds a usable key.
-    This can result in unncessary passphrase prompts.
+    This can result in unnecessary passphrase prompts.
 
 ``gcrypt.gpg-args``
     The contents of this setting are passed as arguments to gpg.
@@ -89,7 +89,7 @@ Environment Variables
 =====================
 
 *GCRYPT_FULL_REPACK*
-    This environment variable forces full repack when pushing.
+    This environment variable forces a full repack when pushing.
 
 Examples
 ========
@@ -107,7 +107,7 @@ How to use a git backend::
     git remote add gitcrypt gcrypt::git@example.com:repo#next
     git push gitcrypt master
 
-The URL fragment (`#next` here) indicates which backend branch is used.
+The URL fragment (``#next`` here) indicates which backend branch is used.
 
 Notes
 =====
@@ -140,7 +140,7 @@ Performance
     large or you are pushing over a slow link, consider using either
     the `rsync://` or `sftp://` transports, which perform incremental
     pushes.  Note that the latter won't work with a repository hosting
-    service like gitolite, GitHub or GitLab.
+    service like Gitolite, GitHub or GitLab.
 
 Repository Format
 .................
@@ -201,8 +201,8 @@ Each item extends until newline, and matches one of the following:
 Detecting gcrypt repos
 ======================
 
-To detect if a git url is a gcrypt repo, use: git-remote-gcrypt --check url
-Exit status if 0 if the repo exists and can be decrypted, 1 if the repo
+To detect if a git url is a gcrypt repo, use: ``git-remote-gcrypt --check url``
+Exit status is 0 if the repo exists and can be decrypted, 1 if the repo
 uses gcrypt but could not be decrypted, and 100 if the repo is not
 encrypted with gcrypt (or could not be accessed).
 
