@@ -28,7 +28,7 @@ Installation
 
 * ``apt-get install git-remote-gcrypt`` on Debian and Ubuntu systems
 
-* or run the supplied ``install.sh`` script on other systems.
+* run the supplied ``install.sh`` script on other systems
 
 Quickstart
 ..........
