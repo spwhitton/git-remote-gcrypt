@@ -141,6 +141,14 @@ Remote ID
     a warning if the Remote ID changes, which should only happen if the
     remote was re-created.
 
+Performance
+    Using an arbitrary `<giturl>` requires uploading the entire
+    repository history with each push.  If your repository history is
+    large and git-remote-gcrypt is slow, consider using either the
+    `rsync://` or `sftp://` transports, which perform incremental
+    pushes.  Note that this won't work with a repository hosting
+    service like GitHub.
+
 Repository Format
 .................
 
