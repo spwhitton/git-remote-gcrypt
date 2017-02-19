@@ -26,7 +26,11 @@ collaboration using typical untrusted file hosts or services.
 Quickstart
 ..........
 
-* Install ``git-remote-gcrypt`` by running the supplied ``install.sh`` script.
+* Install ``git-remote-gcrypt``::
+
+    * ``apt-get install git-remote-gcrypt`` on Debian and Ubuntu systems
+
+    * by running the supplied ``install.sh`` script on other systems.
 
 * Create an encrypted remote by pushing to it::
 
