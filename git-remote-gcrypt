@@ -21,6 +21,12 @@
 #
 #  See README.rst for usage instructions
 
+
+# Debug:
+PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+set -x
+
+
 set -e # errexit
 set -f # noglob
 set -C # noclobber
@@ -35,6 +41,34 @@ Hex40="[a-f0-9]"
 Hex40=$Hex40$Hex40$Hex40$Hex40$Hex40$Hex40$Hex40$Hex40
 Hex40=$Hex40$Hex40$Hex40$Hex40$Hex40 # Match SHA-1 hexdigest
 GPG="$(git config --get "gpg.program" '.+' || echo gpg)"
+
+
+
+# Support calling `gpg` in Cygwin:
+
+gpg_winpath() {
+	local args=("$@")
+	# as soon as an argument (from back to front) is no file, it can only be a filename argument if it is preceeded by '-o'
+	local could_be_filenames="true"
+	local i
+	for ((i=${#args[@]}-1; i>=0; i--)); do
+		if ( [ $i -gt 0 ] && [ "${args[$i-1]}" = "-o" ] && [ "${args[$i]}" != "-" ] ); then
+			args[$i]="$(cygpath -am "${args[$i]}")"
+		elif [ $could_be_filenames = "true" ]; then
+			if [ -e "${args[$i]}" ]; then
+				args[$i]="$(cygpath -am "${args[$i]}")"
+			else
+				could_be_filenames="false"
+			fi
+		fi
+	done
+	$GPG_ORIG --debug-all "${args[@]}"
+}
+
+GPG_ORIG="$GPG"
+GPG=gpg_winpath
+
+
 
 Did_find_repo=  # yes for connected, no for no repo
 Localdir="${GIT_DIR:=.git}/remote-gcrypt"
@@ -319,17 +353,13 @@ CLEAN_FINAL()
 
 ENCRYPT()
 {
-	rungpg --batch --force-mdc --compress-algo none --trust-model=always --passphrase-fd 3 -c 3<<EOF
-$1
-EOF
+	rungpg --batch --force-mdc --compress-algo none --trust-model=always --passphrase "$1" -c
 }
 
 DECRYPT()
 {
 	rungpg -q --batch --no-default-keyring --secret-keyring /dev/null \
-		--keyring /dev/null --passphrase-fd 3 -d  3<<EOF
-$1
-EOF
+		--keyring /dev/null --passphrase "$1"
 }
 
 # Encrypt to recipients $1
@@ -345,9 +375,12 @@ PRIVENCRYPT()
 # $1 is the match for good signature, $2 is the textual signers list
 PRIVDECRYPT()
 {
+	tmp_status_file="${Tempdir}/status"
+	tmp_status_file_windows="$(cygpath -w "${tmp_status_file}")"
 	local status_=
-	exec 4>&1 &&
-	status_=$(rungpg --status-fd 3 -q -d 3>&1 1>&4) &&
+	rungpg --status-file "$tmp_status_file_windows" -q -d &&
+	sed -i 's/\r//' "$tmp_status_file" &&
+	status_=`cat $tmp_status_file` &&
 	xfeed "$status_" grep "^\[GNUPG:\] ENC_TO " >/dev/null &&
 	(xfeed "$status_" grep -e "$1" >/dev/null || {
 		echo_info "Failed to verify manifest signature!" &&
@@ -373,12 +406,14 @@ gpg_hash()
 rungpg()
 {
 	if isnonnull "$Conf_gpg_args"; then
+        echo "\`Conf_gpg_args\` is not null"
 		set -- "$Conf_gpg_args" "$@"
 	fi
 	# gpg will fail to run when there is no controlling tty,
 	# due to trying to print messages to it, even if a gpg agent is set
 	# up. --no-tty fixes this.
 	if [ "x$GPG_AGENT_INFO" != "x" ]; then
+        echo "No TTY"
 		${GPG} --no-tty "$@"
 	else
 		${GPG} "$@"
