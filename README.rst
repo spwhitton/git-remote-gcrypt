@@ -135,12 +135,12 @@ Remote ID
     remote was re-created.
 
 Performance
-    Using an arbitrary `<giturl>` requires uploading the entire
-    repository history with each push.  If your repository history is
-    large or you are pushing over a slow link, consider using either
-    the `rsync://` or `sftp://` transports, which perform incremental
-    pushes.  Note that the latter won't work with a repository hosting
-    service like Gitolite, GitHub or GitLab.
+    Using an arbitrary `<giturl>` or an `sftp://` URI requires
+    uploading the entire repository history with each push.  If your
+    repository history is large or you are pushing over a slow link,
+    consider using the `rsync://` transport, which performs
+    incremental pushes.  Note that the latter won't work with a
+    repository hosting service like Gitolite, GitHub or GitLab.
 
 Repository Format
 .................
