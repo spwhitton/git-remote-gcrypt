@@ -1,4 +1,4 @@
-git-remote-gcrypt (1.0.2) UNRELEASED; urgency=medium
+git-remote-gcrypt (1.0.2-1) UNRELEASED; urgency=medium
 
   Bug fixes:
   * Correctly handle the case where gcrypt.gpg-args contains more than one
@@ -14,9 +14,6 @@ git-remote-gcrypt (1.0.2) UNRELEASED; urgency=medium
   * Other minor edits and formatting changes.
 
   Debian packaging:
-  * Switch to source format 3.0 (native).
-    - Override Lintian tag latest-debian-changelog-entry-changed-to-native.
-    - Drop override of Lintian tag debian-watch-file-is-missing.
   * Replace quilt patch with code in d/rules to remove installation
     instructions from the manpage.
   * Depend on gpg | gnupg1 and demote gnupg to a Recommends (Closes: #873498).
