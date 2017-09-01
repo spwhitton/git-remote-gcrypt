@@ -1,4 +1,4 @@
-git-remote-gcrypt (1.0.2-1) UNRELEASED; urgency=medium
+git-remote-gcrypt (1.0.2-1) unstable; urgency=medium
 
   Bug fixes:
   * Correctly handle the case where gcrypt.gpg-args contains more than one
@@ -23,7 +23,7 @@ git-remote-gcrypt (1.0.2-1) UNRELEASED; urgency=medium
   * Bump copyright years.
   * Bump standards version to 4.1.0 (no changes required).
 
- -- Sean Whitton <spwhitton@spwhitton.name>  Sun, 19 Feb 2017 07:42:05 -0700
+ -- Sean Whitton <spwhitton@spwhitton.name>  Fri, 01 Sep 2017 14:34:35 -0700
 
 git-remote-gcrypt (1.0.1-1) unstable; urgency=low
 
