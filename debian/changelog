@@ -21,6 +21,7 @@ git-remote-gcrypt (1.0.2-1) UNRELEASED; urgency=medium
     only the gpg package installed.
     Thanks to Yuri D'Elia for the report.
   * Bump copyright years.
+  * Bump standards version to 4.1.0 (no changes required).
 
  -- Sean Whitton <spwhitton@spwhitton.name>  Sun, 19 Feb 2017 07:42:05 -0700
 
