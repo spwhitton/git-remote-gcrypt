@@ -10,8 +10,8 @@ Vcs-Browser: https://git.spwhitton.name/git-remote-gcrypt
 
 Package: git-remote-gcrypt
 Architecture: all
-Depends: git, gnupg | gnupg2, ${misc:Depends}
-Recommends: rsync, curl
+Depends: git, gpg | gnupg1, ${misc:Depends}
+Recommends: rsync, curl, gnupg
 Description: encrypted git repositories
  This lets git store git repositories in encrypted form.
  It supports storing repositories on rsync or sftp servers.
