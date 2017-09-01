@@ -8,7 +8,7 @@ git-remote-gcrypt (1.0.2) UNRELEASED; urgency=medium
   Documentation:
   * Drop section "Note to users of GnuPG version 2".
     The issue was a regression in GnuPG 2.x, fixed in version 2.1.16.
-  * Add a note about performance when not using the rsync:// backend.
+  * Add a note about performance when not using the rsync:// or local backends.
   * Add section containing author and maintainer information.
   * Add `apt-get` installation instructions, for the benefit of GitHub users.
   * Other minor edits and formatting changes.
@@ -17,8 +17,8 @@ git-remote-gcrypt (1.0.2) UNRELEASED; urgency=medium
   * Switch to source format 3.0 (native).
     - Override Lintian tag latest-debian-changelog-entry-changed-to-native.
     - Drop override of Lintian tag debian-watch-file-is-missing.
-  * Add code to d/rules to remove installation instructions from the manpage.
-    This replaces the old quilt patch.
+  * Replace quilt patch with code in d/rules to remove installation
+    instructions from the manpage.
   * Depend on gpg | gnupg1 and demote gnupg to a Recommends (Closes: #873498).
     At least with passwordless PGP keys, git-remote-gcrypt works fine with
     only the gpg package installed.
