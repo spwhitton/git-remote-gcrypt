@@ -1,4 +1,4 @@
-git-remote-gcrypt (1.0.2-1) UNRELEASED; urgency=medium
+git-remote-gcrypt (1.0.3-1) UNRELEASED; urgency=medium
 
   * Don't pass '-m 700' to mkdir under Windows, which fails.
     Thanks to Steven R. Loomis for the patch.
