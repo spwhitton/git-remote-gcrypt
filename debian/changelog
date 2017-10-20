@@ -2,6 +2,8 @@ git-remote-gcrypt (1.0.3-1) UNRELEASED; urgency=medium
 
   * Don't pass '-m 700' to mkdir under Windows, which fails.
     Thanks to Steven R. Loomis for the patch.
+  * Add redhat/git-remote-gcrypt.spec
+    Thanks, Frank Grüllich.
 
  -- Sean Whitton <spwhitton@spwhitton.name>  Thu, 28 Sep 2017 18:32:58 -0700
 
