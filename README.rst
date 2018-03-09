@@ -221,7 +221,8 @@ The original author of git-remote-gcrypt was GitHub user bluss.
 
 The de facto maintainer in 2013 and 2014 was Joey Hess.
 
-The current maintainer is Sean Whitton <spwhitton@spwhitton.name>.
+The current maintainer, since 2016, is Sean Whitton
+<spwhitton@spwhitton.name>.
 
 License
 =======
