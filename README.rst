@@ -86,7 +86,7 @@ The following ``git-config(1)`` variables are supported:
     part of the participant list. You may use the per-remote version
     to sign different remotes using different keys.
 
-Environment Variables
+Environment variables
 =====================
 
 *GCRYPT_FULL_REPACK*
@@ -149,7 +149,7 @@ rsync URIs
     whereas plain rsync uses either ``user@host:path`` or
     ``rsync://user@host/path``.
 
-Repository Format
+Repository format
 .................
 
 | `EncSign(X):`   Sign and Encrypt to GPG key holder
@@ -216,7 +216,7 @@ encrypted with gcrypt (or could not be accessed).
 Note that this has to fetch the repo contents into the local git
 repository, the same as is done when using a gcrypt repo.
 
-See Also
+See also
 ========
 
 git-remote-helpers(1), gpg(1)
