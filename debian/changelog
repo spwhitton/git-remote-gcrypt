@@ -7,6 +7,7 @@ git-remote-gcrypt (1.0.3-1) UNRELEASED; urgency=medium
   * Add note about non-standard rsync:// URI format.
     Thanks Jane Soko for pointing this out.
   * Improve first section of manpage.
+  * Add "Known issues".
 
  -- Sean Whitton <spwhitton@spwhitton.name>  Thu, 28 Sep 2017 18:32:58 -0700
 

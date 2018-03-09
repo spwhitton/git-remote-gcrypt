@@ -216,6 +216,17 @@ encrypted with gcrypt (or could not be accessed).
 Note that this has to fetch the repo contents into the local git
 repository, the same as is done when using a gcrypt repo.
 
+Known issues
+============
+
+Every git push effectively has ``--force``.  Be sure to pull before
+pushing.
+
+git-remote-gcrypt can decide to repack the remote without warning,
+which means that your push can suddenly take significantly longer than
+you were expecting, as your whole history has to be reuploaded.
+This push might fail over a poor link.
+
 See also
 ========
 
