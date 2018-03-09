@@ -11,14 +11,15 @@ GNU Privacy Guard-encrypted git remote
 Description
 ===========
 
-Remote helper programs are invoked by git to handle network transport.
-This helper handles `gcrypt::` URLs that will access a remote repository
-encrypted with GPG, using our custom format.
+git-remote-gcrypt is a git remote helper to push and pull from
+repositories encrypted with GnuPG, using a custom format.  This remote
+helper handles URIs prefixed with `gcrypt::`.
 
-Supported locations are `local`, `rsync://` and `sftp://`, where the
-repository is stored as a set of files, or instead any `<giturl>` where
-gcrypt will store the same representation in a git repository, bridged
-over arbitrary git transport.
+Supported backends are `local`, `rsync://` and `sftp://`, where the
+repository is stored as a set of files, or instead any `<giturl>`
+where gcrypt will store the same representation in a git repository,
+bridged over arbitrary git transport.  See "Performance" below for
+backends comparison.
 
 The aim is to provide confidential, authenticated git storage and
 collaboration using typical untrusted file hosts or services.
