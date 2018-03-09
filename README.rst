@@ -142,6 +142,12 @@ Performance
     incremental pushes.  Note that the latter won't work with a
     repository hosting service like Gitolite, GitHub or GitLab.
 
+rsync URIs
+    Note that the URI format for the rsync backend is, regretably,
+    non-standard.  git-remote-gcrypt uses ``rsync://user@host:path``
+    whereas plain rsync uses either ``user@host:path`` or
+    ``rsync://user@host/path``.
+
 Repository Format
 .................
 

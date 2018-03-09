@@ -4,6 +4,8 @@ git-remote-gcrypt (1.0.3-1) UNRELEASED; urgency=medium
     Thanks to Steven R. Loomis for the patch.
   * Add redhat/git-remote-gcrypt.spec
     Thanks, Frank Grüllich.
+  * Add note about non-standard rsync:// URI format.
+    Thanks Jane Soko for pointing this out.
 
  -- Sean Whitton <spwhitton@spwhitton.name>  Thu, 28 Sep 2017 18:32:58 -0700
 
