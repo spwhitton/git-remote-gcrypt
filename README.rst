@@ -15,10 +15,10 @@ git-remote-gcrypt is a git remote helper to push and pull from
 repositories encrypted with GnuPG, using a custom format.  This remote
 helper handles URIs prefixed with `gcrypt::`.
 
-Supported backends are `local`, `rsync://` and `sftp://`, where the
-repository is stored as a set of files, or instead any `<giturl>`
-where gcrypt will store the same representation in a git repository,
-bridged over arbitrary git transport.  See "Performance" below for
+Supported backends are `local`, `rsync://` and `sftp://` (and an experimental
+`rclone://` backend), where the repository is stored as a set of files, or
+instead any `<giturl>` where gcrypt will store the same representation in a git
+repository, bridged over arbitrary git transport.  See "Performance" below for
 backends comparison.
 
 The aim is to provide confidential, authenticated git storage and
@@ -119,9 +119,9 @@ Collaboration
     keys of all collaborators and correct participant config.
 
 Dependencies
-    ``rsync`` and ``curl`` for remotes ``rsync:`` and ``sftp:``
-    respectively. The main executable requires a POSIX-compliant shell
-    that supports ``local``.
+    ``rsync``, ``curl`` and ``rclone`` for remotes ``rsync:``, ``sftp:`` and
+    ``rclone:`` respectively. The main executable requires a POSIX-compliant
+    shell that supports ``local``.
 
 GNU Privacy Guard
     Both GPG 1.4 and 2 are supported. You need a personal GPG key. GPG
@@ -148,6 +148,12 @@ rsync URIs
     non-standard.  git-remote-gcrypt uses ``rsync://user@host:path``
     whereas plain rsync uses either ``user@host:path`` or
     ``rsync://user@host/path``.
+
+rclone URIs
+    The URI format for the rclone backend is the same as rclone URI,
+    ``rclone://<rclone-uri>``, and require to add the corresponding remote
+    in the rclone configuration.
+    Please refer to the rclone documentation for more information.
 
 Repository format
 .................

@@ -230,6 +230,9 @@ GET()
 	elif isurl rsync "$1"
 	then
 		(exec 0>&-; rsync -I -W "${1#rsync://}"/"$2" "$3" >&2)
+	elif isurl rclone "$1"
+	then
+		(exec 0>&-; rclone copyto "${1#rclone://}"/"$2" "$3" >&2)
 	elif islocalrepo "$1"
 	then
 		cat "$1/$2" > "$3"
@@ -247,6 +250,9 @@ PUT()
 	elif isurl rsync "$1"
 	then
 		rsync -I -W "$3" "${1#rsync://}"/"$2" >&2
+	elif isurl rclone "$1"
+	then
+		rclone copyto "$3" "${1#rclone://}"/"$2" >&2
 	elif islocalrepo "$1"
 	then
 		cat >| "$1/$2" < "$3"
@@ -258,7 +264,7 @@ PUT()
 # Put all PUT changes for repo $1 at once
 PUT_FINAL()
 {
-	if isurl sftp "$1" || islocalrepo "$1" || isurl rsync "$1"
+	if isurl sftp "$1" || islocalrepo "$1" || isurl rsync "$1" || isurl rclone "$1"
 	then
 		:
 	else
@@ -275,6 +281,9 @@ PUTREPO()
 	elif isurl rsync "$1"
 	then
 		rsync -q -r --exclude='*' "$Localdir/" "${1#rsync://}" >&2
+	elif isurl rclone "$1"
+	then
+		rclone mkdir "${1#rclone://}" >&2
 	elif islocalrepo "$1"
 	then
 		mkdir -p "$1"
@@ -295,6 +304,9 @@ REMOVE()
 	then
 		xfeed "$2" rsync -I -W -v -r --delete --include-from=- \
 			--exclude='*' "$Localdir"/ "${1#rsync://}/" >&2
+	elif isurl rclone "$1"
+	then
+		xfeed "$2" rclone delete -v --include-from=/dev/stdin "${1#rclone://}/" >&2
 	elif islocalrepo "$1"
 	then
 		for fn_ in $2; do
@@ -309,7 +321,7 @@ REMOVE()
 
 CLEAN_FINAL()
 {
-	if isurl sftp "$1" || islocalrepo "$1" || isurl rsync "$1"
+	if isurl sftp "$1" || islocalrepo "$1" || isurl rsync "$1" || isurl rclone "$1"
 	then
 		:
 	else
@@ -496,13 +508,18 @@ ensure_connected()
 		echo_info "Updated URL for $r_name, gitception:// -> ()"
 	fi
 
+	if isurl rclone "$URL"; then
+		echo_info "WARNING: git-remote-gcrypt's rclone support is experimental." \
+			"  Keep backups."
+	fi
+
 	# Find the URL fragment
 	url_frag=${URL##*"#"}
 	isnoteq "$url_frag" "$URL" || url_frag=
 	URL=${URL%"#$url_frag"}
 
 	# manifestfile -- sha224 hash if we can, else the default location
-	if isurl sftp "$URL" || islocalrepo "$URL" || isurl rsync "$URL"
+	if isurl sftp "$URL" || islocalrepo "$URL" || isurl rsync "$URL" || isurl rclone "$URL"
 	then
 		# not for gitception
 		isnull "$url_frag" ||
