@@ -15,11 +15,14 @@ git-remote-gcrypt is a git remote helper to push and pull from
 repositories encrypted with GnuPG, using a custom format.  This remote
 helper handles URIs prefixed with `gcrypt::`.
 
-Supported backends are `local`, `rsync://` and `sftp://` (and an experimental
-`rclone://` backend), where the repository is stored as a set of files, or
-instead any `<giturl>` where gcrypt will store the same representation in a git
-repository, bridged over arbitrary git transport.  See "Performance" below for
+Supported backends are `local`, `rsync://` and `sftp://`, where the
+repository is stored as a set of files, or instead any `<giturl>`
+where gcrypt will store the same representation in a git repository,
+bridged over arbitrary git transport.  See "Performance" below for
 backends comparison.
+
+There is also an experimental `rclone://` backend for early adoptors
+only (you have been warned).
 
 The aim is to provide confidential, authenticated git storage and
 collaboration using typical untrusted file hosts or services.
@@ -149,11 +152,14 @@ rsync URIs
     whereas plain rsync uses either ``user@host:path`` or
     ``rsync://user@host/path``.
 
-rclone URIs
-    The URI format for the rclone backend is the same as rclone URI,
-    ``rclone://<rclone-uri>``, and require to add the corresponding remote
-    in the rclone configuration.
-    Please refer to the rclone documentation for more information.
+rclone backend
+    In addition to adding the rclone backend as a remote with URI like
+    ``gcrypt::rclone://remote:subdir``, you must add the remote to the
+    rclone configuration too.  This is typically done by executing
+    ``rclone config``.  See rclone(1).
+
+    The rclone backend is considered experimental and is for early
+    adoptors only.  You have been warned.
 
 Repository format
 .................
