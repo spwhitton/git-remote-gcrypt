@@ -1,4 +1,4 @@
-git-remote-gcrypt (1.1-1) UNRELEASED; urgency=medium
+git-remote-gcrypt (1.1-1) unstable; urgency=medium
 
   Upstream:
   * Add CONTRIBUTING.md and DEVELOPER-CERTIFICATE.
@@ -8,7 +8,7 @@ git-remote-gcrypt (1.1-1) UNRELEASED; urgency=medium
   Debian packaging:
   * Suggest rclone.
 
- -- Sean Whitton <spwhitton@spwhitton.name>  Wed, 18 Apr 2018 11:01:03 -0700
+ -- Sean Whitton <spwhitton@spwhitton.name>  Sat, 28 Apr 2018 13:32:48 -0700
 
 git-remote-gcrypt (1.0.3-1) unstable; urgency=medium
 
