@@ -508,11 +508,6 @@ ensure_connected()
 		echo_info "Updated URL for $r_name, gitception:// -> ()"
 	fi
 
-	if isurl rclone "$URL"; then
-		echo_info "WARNING: git-remote-gcrypt's rclone support is experimental." \
-			"  Keep backups."
-	fi
-
 	# Find the URL fragment
 	url_frag=${URL##*"#"}
 	isnoteq "$url_frag" "$URL" || url_frag=
@@ -860,6 +855,11 @@ setup()
 
 	trap cleanup_tmpfiles EXIT
 	trap 'exit 1' 1 2 3 15
+
+	if isurl rclone "$URL"; then
+		echo_info "WARNING: rclone support is experimental."
+		echo_info "WARNING: Early adoptors only.  Keep backups."
+	fi
 }
 
 # handle git-remote-helpers protocol
