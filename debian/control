@@ -12,6 +12,7 @@ Package: git-remote-gcrypt
 Architecture: all
 Depends: git, gpg | gnupg1, ${misc:Depends}
 Recommends: rsync, curl, gnupg
+Suggests: rclone
 Description: encrypted git repositories
  This lets git store git repositories in encrypted form.
  It supports storing repositories on rsync or sftp servers.

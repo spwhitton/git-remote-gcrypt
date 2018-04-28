@@ -1,8 +1,12 @@
 git-remote-gcrypt (1.1-1) UNRELEASED; urgency=medium
 
+  Upstream:
   * Add CONTRIBUTING.md and DEVELOPER-CERTIFICATE.
   * Add experimental rclone backend (for early adoptors only).
     Thanks Beren Minor for the patch.
+
+  Debian packaging:
+  * Suggest rclone.
 
  -- Sean Whitton <spwhitton@spwhitton.name>  Wed, 18 Apr 2018 11:01:03 -0700
 
