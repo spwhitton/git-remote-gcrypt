@@ -934,5 +934,24 @@ then
 		exit 100
 	fi
 else
-	gcrypt_main_loop "$@"
+	# crappy reimplementation of getopt, because we need to ignore arbitrary arguments
+	for i
+	do
+	    case "$1" in
+	    -*)
+	        # ignore other options
+	        shift
+	        ;;
+	    *)
+	        # first argument is name, second is url
+	        if [ -n "$name" ]; then
+	            name="$1"
+		else
+		    url="$1"
+		fi
+	        shift
+	        ;;
+	    esac   
+	done
+	gcrypt_main_loop "$name" "$url"
 fi
