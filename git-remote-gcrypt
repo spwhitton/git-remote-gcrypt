@@ -934,5 +934,23 @@ then
 		exit 100
 	fi
 else
-	gcrypt_main_loop "$@"
+	for i
+	do
+	    case "$1" in
+	    -*)
+	        # ignore arbitrary options passed by git
+	        shift
+	        ;;
+	    *)
+	        # first argument is name, second is url
+	        if [ -n "$name" ]; then
+	            name="$1"
+		else
+		    url="$1"
+		fi
+	        shift
+	        ;;
+	    esac
+	done
+	gcrypt_main_loop "$name" "$url"
 fi
