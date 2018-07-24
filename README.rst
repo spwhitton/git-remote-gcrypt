@@ -239,6 +239,9 @@ which means that your push can suddenly take significantly longer than
 you were expecting, as your whole history has to be reuploaded.
 This push might fail over a poor link.
 
+git-remote-gcrypt might report a repository as not found when having
+authentication, port, or network connectivity issues.
+
 See also
 ========
 
