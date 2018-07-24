@@ -4,6 +4,8 @@ git-remote-gcrypt (1.1-1) unstable; urgency=medium
   * Add CONTRIBUTING.md and DEVELOPER-CERTIFICATE.
   * Add experimental rclone backend (for early adoptors only).
     Thanks Beren Minor for the patch.
+  * Note that git-remote-gcrypt's "not found" error can be misleading.
+    Thanks Ulrike Uhlig for the patch.
 
   Debian packaging:
   * Suggest rclone.
