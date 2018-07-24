@@ -1,11 +1,17 @@
+git-remote-gcrypt (1.1-2) UNRELEASED; urgency=medium
+
+  Upstream:
+  * Note that git-remote-gcrypt's "not found" error can be misleading.
+    Thanks Ulrike Uhlig for the patch.
+
+ -- Sean Whitton <spwhitton@spwhitton.name>  Tue, 24 Jul 2018 19:45:02 +0800
+
 git-remote-gcrypt (1.1-1) unstable; urgency=medium
 
   Upstream:
   * Add CONTRIBUTING.md and DEVELOPER-CERTIFICATE.
   * Add experimental rclone backend (for early adoptors only).
     Thanks Beren Minor for the patch.
-  * Note that git-remote-gcrypt's "not found" error can be misleading.
-    Thanks Ulrike Uhlig for the patch.
 
   Debian packaging:
   * Suggest rclone.
