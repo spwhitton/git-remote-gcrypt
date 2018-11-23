@@ -492,7 +492,7 @@ read_config()
 ensure_connected()
 {
 	local manifest_= r_repoid= r_name= url_frag= r_sigmatch= r_signers= \
-		tmp_manifest=
+		tmp_manifest= tmp_stderr=
 
 	if isnonnull "$Did_find_repo"
 	then
@@ -529,7 +529,9 @@ ensure_connected()
 
 
 	tmp_manifest="$Tempdir/maniF"
-	GET "$URL" "$Manifestfile" "$tmp_manifest" 2>/dev/null || {
+	tmp_stderr="$Tempdir/stderr"
+	GET "$URL" "$Manifestfile" "$tmp_manifest" 2>| "$tmp_stderr" || {
+		cat >&2 "$tmp_stderr"
 		echo_info "Repository not found: $URL"
 		if ! isnull "$Repoid"; then
 			echo_info "..but repository ID is set. Aborting."
