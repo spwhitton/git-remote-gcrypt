@@ -1,6 +1,8 @@
-git-remote-gcrypt (1.1-2) UNRELEASED; urgency=medium
+git-remote-gcrypt (1.2-1) UNRELEASED; urgency=medium
 
   Upstream:
+  * When the repository cannot be found, output the stderr of other
+    commands to help the user figure out what's wrong (Closes: #914059).
   * Note that git-remote-gcrypt's "not found" error can be misleading.
     Thanks Ulrike Uhlig for the patch.
 
