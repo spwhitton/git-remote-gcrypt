@@ -1,4 +1,4 @@
-git-remote-gcrypt (1.2-1) UNRELEASED; urgency=low
+git-remote-gcrypt (1.2-1) unstable; urgency=low
 
   Upstream:
   * When the repository cannot be found, but the repo ID is set, output the
@@ -7,7 +7,7 @@ git-remote-gcrypt (1.2-1) UNRELEASED; urgency=low
   * Note that git-remote-gcrypt's "not found" error can be misleading.
     Thanks Ulrike Uhlig for the patch.
 
- -- Sean Whitton <spwhitton@spwhitton.name>  Tue, 24 Jul 2018 19:45:02 +0800
+ -- Sean Whitton <spwhitton@spwhitton.name>  Mon, 26 Nov 2018 22:08:19 -0700
 
 git-remote-gcrypt (1.1-1) unstable; urgency=medium
 
