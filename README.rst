@@ -93,7 +93,7 @@ Environment variables
 =====================
 
 *GCRYPT_FULL_REPACK*
-    This environment variable forces a full repack when pushing.
+    When set (to anything), this environment variable forces a full repack when pushing.
 
 Examples
 ========
