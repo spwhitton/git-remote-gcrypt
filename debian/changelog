@@ -1,3 +1,11 @@
+git-remote-gcrypt (1.3-1) UNRELEASED; urgency=medium
+
+  Upstream:
+  * README.md: Clarify how to use GCRYPT_FULL_REPACK.
+    Thanks Félix Sipma for the patch.
+
+ -- Sean Whitton <spwhitton@spwhitton.name>  Sun, 03 Mar 2019 09:13:41 -0700
+
 git-remote-gcrypt (1.2-1) unstable; urgency=low
 
   Upstream:
