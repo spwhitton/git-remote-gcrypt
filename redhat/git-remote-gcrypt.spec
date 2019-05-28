@@ -1,7 +1,7 @@
 %global debug_package %{nil}
 
 Name:		git-remote-gcrypt
-Version:	1.0.2
+Version:	1.2
 Release:	1%{?dist}
 Summary:	GNU Privacy Guard-encrypted git remote
 
@@ -10,7 +10,7 @@ License:	GPLv3
 URL:		https://git.spwhitton.name/%{name}
 Source0:	%{name}-%{version}.tar.gz
 
-BuildRequires:	python2-docutils
+BuildRequires:	python3-docutils
 Requires:	gnupg2 git-core
 
 %description
