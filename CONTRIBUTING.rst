@@ -3,8 +3,9 @@ Submitting patches
 
 Thank you for your interest in contributing to this project!
 
-Please **do not** submit a pull request on GitHub.  This repository is
-an automated mirror, and I don't develop using GitHub's platform.
+Please **do not** submit a pull request on GitHub.  The repository
+there is an automated mirror, and I don't develop using GitHub's
+platform.
 
 Instead, either
 
