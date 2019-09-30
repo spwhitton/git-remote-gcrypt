@@ -35,7 +35,7 @@ export prefix="%{_prefix}"
 ./install.sh
 
 %files
-/usr/bin/%{name}
+%{_bindir}/%{name}
 %doc /usr/share/man/man1/%{name}.1.gz
 
 %changelog
