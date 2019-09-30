@@ -1,5 +1,3 @@
-%global debug_package %{nil}
-
 Name:       git-remote-gcrypt
 Version:    1.2
 Release:    1%{?dist}
