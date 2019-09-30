@@ -36,7 +36,7 @@ export prefix="%{_prefix}"
 
 %files
 %{_bindir}/%{name}
-%doc /usr/share/man/man1/%{name}.1.gz
+%{_mandir}/man1/%{name}.1*
 
 %changelog
 
