@@ -8,7 +8,7 @@ Summary:    GNU Privacy Guard-encrypted git remote
 Group:      Development Tools
 License:    GPLv3
 URL:        https://git.spwhitton.name/%{name}
-Source0:    %{name}-%{version}.tar.gz
+Source0:    https://git.spwhitton.name/%{name}/snapshot/%{name}-%{version}.tar.gz
 
 BuildRequires:  python3-docutils
 Requires:   gnupg2 git-core
@@ -24,7 +24,7 @@ The aim is to provide confidential, authenticated git storage and
 collaboration using typical untrusted file hosts or services.
 
 %prep
-%setup -q -n %{name}
+%setup -q -n %{name}-%{version}
 
 %build
 :
