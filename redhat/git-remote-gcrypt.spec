@@ -10,6 +10,8 @@ License:    GPLv3
 URL:        https://git.spwhitton.name/%{name}
 Source0:    https://git.spwhitton.name/%{name}/snapshot/%{name}-%{version}.tar.gz
 
+BuildArch:  noarch
+
 BuildRequires:  python3-docutils
 Requires:   gnupg2 git-core
 
