@@ -37,6 +37,8 @@ export prefix="%{_prefix}"
 %files
 %{_bindir}/%{name}
 %{_mandir}/man1/%{name}.1*
+%license COPYING
+%doc CHANGELOG CONTRIBUTING.rst README.rst
 
 %changelog
 
