@@ -4,7 +4,7 @@ git-remote-gcrypt (1.3-1) UNRELEASED; urgency=medium
   * README.md: Clarify how to use GCRYPT_FULL_REPACK.
     Thanks Félix Sipma for the patch.
   * Updates to redhat/git-remote-gcrypt.spec.
-    Thanks Frank Grüllich for the patch.
+    Thanks Frank Grüllich and Dusty Mabe for patches.
 
  -- Sean Whitton <spwhitton@spwhitton.name>  Sun, 03 Mar 2019 09:13:41 -0700
 
