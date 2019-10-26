@@ -1,7 +1,7 @@
 Source: git-remote-gcrypt
 Section: vcs
 Priority: optional
-Build-Depends: debhelper (>= 10), python-docutils (>= 0.12+dfsg)
+Build-Depends: debhelper (>= 10), python3-docutils (>= 0.12+dfsg)
 Maintainer: Sean Whitton <spwhitton@spwhitton.name>
 Standards-Version: 4.1.0
 Homepage: https://spwhitton.name/tech/code/git-remote-gcrypt/
