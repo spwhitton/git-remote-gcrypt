@@ -1,0 +1,11 @@
+    Options to review:
+    - http://blog.liw.fi/posts/yarn/
+    - Look at the test suite for mairix
+    - Look into shunit2 as used by autodep8
+    - [[https://github.com/sstephenson/bats][bats]]
+
+    Probably use shunit2, [[https://www.leadingagile.com/2018/10/unit-testing-shell-scriptspart-two/][as it makes mocking possible using aliases]] (or
+    alternatively, prefix PATH with a folder of mocked scripts, which is a
+    bit less flexible).
+
+    NO WAIT just do it in perl with Test::More, like i3 does
