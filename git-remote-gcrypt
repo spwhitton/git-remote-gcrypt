@@ -249,7 +249,7 @@ PUT()
 		curl -s -S -k --ftp-create-dirs -T "$3" "$1/$2"
 	elif isurl rsync "$1"
 	then
-		rsync -I -W "$3" "${1#rsync://}"/"$2" >&2
+		rsync $Conf_rsync_put_flags -I -W "$3" "${1#rsync://}"/"$2" >&2
 	elif isurl rclone "$1"
 	then
 		rclone copyto "$3" "${1#rclone://}"/"$2" >&2
@@ -280,7 +280,8 @@ PUTREPO()
 		:
 	elif isurl rsync "$1"
 	then
-		rsync -q -r --exclude='*' "$Localdir/" "${1#rsync://}" >&2
+		rsync $Conf_rsync_put_flags -q -r --exclude='*' \
+			"$Localdir/" "${1#rsync://}" >&2
 	elif isurl rclone "$1"
 	then
 		rclone mkdir "${1#rclone://}" >&2
@@ -429,6 +430,8 @@ read_config()
 	Conf_pubish_participants=$(git config --get --bool "remote.$NAME.gcrypt-publish-participants" '.+' ||
 		git config --get --bool gcrypt.publish-participants || :)
 	Conf_gpg_args=$(git config --get gcrypt.gpg-args '.+' || :)
+	Conf_rsync_put_flags=$(git config --get "remote.$NAME.gcrypt-rsync-put-flags" '.+' ||
+		git config --get "gcrypt.rsync-put-flags" '.+' || :)
 
 	# Figure out which keys we should encrypt to or accept signatures from
 	if isnull "$conf_part" || iseq "$conf_part" simple

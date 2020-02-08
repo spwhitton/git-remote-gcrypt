@@ -89,6 +89,13 @@ The following ``git-config(1)`` variables are supported:
     part of the participant list. You may use the per-remote version
     to sign different remotes using different keys.
 
+``remote.<name>.gcrypt-rsync-put-flags``
+    ..
+``gcrypt.rsync-put-flags``
+    Flags to be passed to ``rsync`` when uploading to a remote using the
+    ``rsync://`` backend. If the flags are set to a specific remote, the
+    global flags, if also set, will not be applied for that remote.
+
 Environment variables
 =====================
 
