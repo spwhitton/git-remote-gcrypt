@@ -1,7 +1,7 @@
 git-remote-gcrypt (1.4-1) UNRELEASED; urgency=medium
 
   Upstream:
-  * CONTRIBUTING.md:
+  * CONTRIBUTING.rst:
     - Add mailing list information.
     - Add link to "How to Report Bugs Effectively".
   * PULL_REQUEST_TEMPLATE.md: replace patch submission instructions with
