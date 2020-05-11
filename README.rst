@@ -30,7 +30,8 @@ collaboration using typical untrusted file hosts or services.
 Installation
 ............
 
-* ``apt-get install git-remote-gcrypt`` on Debian and Ubuntu systems
+* use your GNU/Linux distribution's package manager -- Debian, Ubuntu,
+  Fedora, Arch and some smaller distros are known to have packages
 
 * run the supplied ``install.sh`` script on other systems
 
