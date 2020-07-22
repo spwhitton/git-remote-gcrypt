@@ -773,9 +773,11 @@ EOF
 	then
 		if [ "$Conf_force_required" = true ]
 		then
-			echo_die "gcrypt.force-required is set to true.  Explicitly force push by passing --force in order to override this error."
+			echo_die "Implicit force push disallowed by gcrypt configuration."
 		else
-			echo_info "An implicit --force push is occuring. Please set 'git config --global add gcrypt.force-required true' to protect from implicit force pushes."
+			echo_info "Due to a longstanding bug, this push implicitly has --force."
+			echo_info "Consider explicitly passing --force, and setting"
+			echo_info "gcrypt's require-explicit-force-push git config key."
 		fi
 	fi
 

@@ -100,14 +100,10 @@ The following ``git-config(1)`` variables are supported:
 ``remote.<name>.gcrypt-require-explicit-force-push``
     ..
 ``gcrypt.require-explicit-force-push``
-    A known issue is that every git push effectively has a ``--force``.
+    A longstanding bug is that every git push effectively has a ``--force``.
 
-    By default, git-remote-gcrypt will warn the user of this known issue
-    when a push is requested without the ``--force`` flag.
-
-    If this flag is set to ``true``, git-remote-gcrypt will fail to push,
-    as a precaution, unless ``--force`` is passed to git or you prefix your
-    refspecs with a '+'.
+    If this flag is set to ``true``, git-remote-gcrypt will refuse to push,
+    unless ``--force`` is passed, or refspecs are prefixed with ``+``.
 
 Environment variables
 =====================
