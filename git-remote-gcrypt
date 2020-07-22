@@ -432,8 +432,8 @@ read_config()
 	Conf_gpg_args=$(git config --get gcrypt.gpg-args '.+' || :)
 	Conf_rsync_put_flags=$(git config --get "remote.$NAME.gcrypt-rsync-put-flags" '.+' ||
 		git config --get "gcrypt.rsync-put-flags" '.+' || :)
-	Conf_force_required=$(git config --get --bool "remote.$NAME.gcrypt-force-required" '.+' ||
-		git config --get --bool gcrypt.force-required '.+' || :)
+	Conf_force_required=$(git config --get --bool "remote.$NAME.gcrypt-require-explicit-force-push" '.+' ||
+		git config --get --bool gcrypt.require-explicit-force-push '.+' || :)
 
 	# Figure out which keys we should encrypt to or accept signatures from
 	if isnull "$conf_part" || iseq "$conf_part" simple

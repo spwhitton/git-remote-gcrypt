@@ -97,9 +97,9 @@ The following ``git-config(1)`` variables are supported:
     ``rsync://`` backend. If the flags are set to a specific remote, the
     global flags, if also set, will not be applied for that remote.
 
-``remote.<name>.gcrypt-force-required``
+``remote.<name>.gcrypt-require-explicit-force-push``
     ..
-``gcrypt.force-required``
+``gcrypt.require-explicit-force-push``
     A known issue is that every git push effectively has a ``--force``.
 
     By default, git-remote-gcrypt will warn the user of this known issue
