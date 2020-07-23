@@ -426,12 +426,14 @@ read_config()
 	Conf_signkey=$(git config --get "remote.$NAME.gcrypt-signingkey" '.+' ||
 		git config --path user.signingkey || :)
 	conf_part=$(git config --get "remote.$NAME.gcrypt-participants" '.+' ||
-		    git config --get gcrypt.participants '.+' || :)
+		git config --get gcrypt.participants '.+' || :)
 	Conf_pubish_participants=$(git config --get --bool "remote.$NAME.gcrypt-publish-participants" '.+' ||
 		git config --get --bool gcrypt.publish-participants || :)
 	Conf_gpg_args=$(git config --get gcrypt.gpg-args '.+' || :)
 	Conf_rsync_put_flags=$(git config --get "remote.$NAME.gcrypt-rsync-put-flags" '.+' ||
 		git config --get "gcrypt.rsync-put-flags" '.+' || :)
+	Conf_force_required=$(git config --get --bool "remote.$NAME.gcrypt-force-required" '.+' ||
+		git config --get --bool gcrypt.force-required '.+' || :)
 
 	# Figure out which keys we should encrypt to or accept signatures from
 	if isnull "$conf_part" || iseq "$conf_part" simple
@@ -730,7 +732,8 @@ do_push()
 	# file's hash. The manifest is updated with the pack id.
 	# The manifest is encrypted.
 	local r_revlist= pack_id= key_= obj_= src_= dst_= \
-		r_pack_delete= tmp_encrypted= tmp_objlist= tmp_manifest=
+		r_pack_delete= tmp_encrypted= tmp_objlist= tmp_manifest= \
+		force_passed=
 
 	ensure_connected
 
@@ -745,9 +748,12 @@ do_push()
 		r_revlist=$(xfeed "$Refslist" cut -f 1 -d ' ' |
 			safe_git_rev_parse | sed -e 's/^\(.\)/^&/')
 	fi
-
 	while IFS=: read -r src_ dst_ # << +src:dst
 	do
+		if [ "+" != "${src_:0:1}" ]
+		then
+			force_passed=false
+		fi
 		src_=${src_#+}
 		filter_to ! @Refslist "$Hex40 $dst_" "$Refslist"
 
@@ -760,6 +766,15 @@ do_push()
 	done <<EOF
 $1
 EOF
+	if [ "$force_passed" = false ]
+	then
+		if [ "$Conf_force_required" = true ]
+		then
+			echo_die "gcrypt.force-required is set to true.  Explicitly force push by passing --force in order to override this error."
+		else
+			echo_info "An implicit --force push is occuring. Please set 'git config --global add gcrypt.force-required true' to protect from implicit force pushes."
+		fi
+	fi
 
 	tmp_encrypted="$Tempdir/packP"
 	tmp_objlist="$Tempdir/objlP"
