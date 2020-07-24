@@ -751,7 +751,7 @@ do_push()
 
 	while IFS=: read -r src_ dst_ # << +src:dst
 	do
-		if [ "+" != "${src_:0:1}" ]
+		if [ $(echo "$src_" | cut -c1) != + ]
 		then
 			force_passed=false
 		fi
