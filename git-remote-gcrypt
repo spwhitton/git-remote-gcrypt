@@ -748,12 +748,14 @@ do_push()
 		r_revlist=$(xfeed "$Refslist" cut -f 1 -d ' ' |
 			safe_git_rev_parse | sed -e 's/^\(.\)/^&/')
 	fi
+
 	while IFS=: read -r src_ dst_ # << +src:dst
 	do
 		if [ "+" != "${src_:0:1}" ]
 		then
 			force_passed=false
 		fi
+
 		src_=${src_#+}
 		filter_to ! @Refslist "$Hex40 $dst_" "$Refslist"
 
@@ -766,6 +768,7 @@ do_push()
 	done <<EOF
 $1
 EOF
+
 	if [ "$force_passed" = false ]
 	then
 		if [ "$Conf_force_required" = true ]
