@@ -3,7 +3,7 @@ git-remote-gcrypt (1.4-1) UNRELEASED; urgency=medium
   Upstream:
   * Add gcrypt.require-explicit-force-push configuration key.
     Thanks to Jay Colson for the idea and a patch.
-  * Support rsync URIs like "rsync://user@host/path".
+  * Support rsync URIs like "rsync://user@host/path" (Closes: #980397).
     Thanks to Joey Hess for the patch.
   * CONTRIBUTING.rst:
     - Add mailing list information.
