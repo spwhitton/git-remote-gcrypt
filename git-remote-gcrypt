@@ -149,6 +149,12 @@ line_count()
 	xecho "$#"
 }
 
+# Convert URI in standard or nonstandard form to rsync's user@host:path
+rsynclocation ()
+{
+	echo "${1#rsync://}" | sed 's/\(^[^:/]*\)\//\1:\//'
+}
+
 
 ## gitception part
 # Fetch giturl $1, file $2
@@ -229,7 +235,7 @@ GET()
 		(exec 0>&-; curl -s -S -k "$1/$2") > "$3"
 	elif isurl rsync "$1"
 	then
-		(exec 0>&-; rsync -I -W "${1#rsync://}"/"$2" "$3" >&2)
+		(exec 0>&-; rsync -I -W "$(rsynclocation "$1")"/"$2" "$3" >&2)
 	elif isurl rclone "$1"
 	then
 		(exec 0>&-; rclone copyto "${1#rclone://}"/"$2" "$3" >&2)
@@ -249,7 +255,7 @@ PUT()
 		curl -s -S -k --ftp-create-dirs -T "$3" "$1/$2"
 	elif isurl rsync "$1"
 	then
-		rsync $Conf_rsync_put_flags -I -W "$3" "${1#rsync://}"/"$2" >&2
+		rsync $Conf_rsync_put_flags -I -W "$3" "$(rsynclocation "$1")"/"$2" >&2
 	elif isurl rclone "$1"
 	then
 		rclone copyto "$3" "${1#rclone://}"/"$2" >&2
@@ -281,7 +287,7 @@ PUTREPO()
 	elif isurl rsync "$1"
 	then
 		rsync $Conf_rsync_put_flags -q -r --exclude='*' \
-			"$Localdir/" "${1#rsync://}" >&2
+			"$Localdir/" "$(rsynclocation "$1")" >&2
 	elif isurl rclone "$1"
 	then
 		rclone mkdir "${1#rclone://}" >&2
@@ -304,7 +310,7 @@ REMOVE()
 	elif isurl rsync "$1"
 	then
 		xfeed "$2" rsync -I -W -v -r --delete --include-from=- \
-			--exclude='*' "$Localdir"/ "${1#rsync://}/" >&2
+			--exclude='*' "$Localdir"/ "$(rsynclocation "$1")/" >&2
 	elif isurl rclone "$1"
 	then
 		xfeed "$2" rclone delete -v --include-from=/dev/stdin "${1#rclone://}/" >&2

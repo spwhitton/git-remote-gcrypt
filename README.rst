@@ -40,7 +40,7 @@ Quickstart
 
 Create an encrypted remote by pushing to it::
 
-    git remote add cryptremote gcrypt::rsync://example.com:repo
+    git remote add cryptremote gcrypt::rsync://example.com/repo
     git push cryptremote master
     > gcrypt: Setting up new repository
     > gcrypt: Remote ID is :id:7VigUnLVYVtZx8oir34R
@@ -116,7 +116,7 @@ Examples
 
 How to set up a remote for two participants::
 
-    git remote add cryptremote gcrypt::rsync://example.com:repo
+    git remote add cryptremote gcrypt::rsync://example.com/repo
     git config remote.cryptremote.gcrypt-participants "KEY1 KEY2"
     git push cryptremote master
 
@@ -163,10 +163,12 @@ Performance
     repository hosting service like Gitolite, GitHub or GitLab.
 
 rsync URIs
-    Note that the URI format for the rsync backend is, regretably,
-    non-standard.  git-remote-gcrypt uses ``rsync://user@host:path``
-    whereas plain rsync uses either ``user@host:path`` or
-    ``rsync://user@host/path``.
+    The URI format for the rsync backend is ``rsync://user@host/path``,
+    which translates to the rsync location ``user@host:/path``,
+    accessed over ssh. Note that the path is absolute, not relative to the
+    home directory. An earlier non-standard URI format is also supported:
+    ``rsync://user@host:path``, which translates to the rsync location
+    ``user@host:path``
 
 rclone backend
     In addition to adding the rclone backend as a remote with URI like
