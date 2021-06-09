@@ -238,7 +238,7 @@ GET()
 		(exec 0>&-; rsync -I -W "$(rsynclocation "$1")"/"$2" "$3" >&2)
 	elif isurl rclone "$1"
 	then
-		(exec 0>&-; rclone copyto "${1#rclone://}"/"$2" "$3" >&2)
+		(exec 0>&-; rclone copyto --error-on-no-transfer "${1#rclone://}"/"$2" "$3" >&2)
 	elif islocalrepo "$1"
 	then
 		cat "$1/$2" > "$3"
@@ -258,7 +258,7 @@ PUT()
 		rsync $Conf_rsync_put_flags -I -W "$3" "$(rsynclocation "$1")"/"$2" >&2
 	elif isurl rclone "$1"
 	then
-		rclone copyto "$3" "${1#rclone://}"/"$2" >&2
+		rclone copyto --error-on-no-transfer "$3" "${1#rclone://}"/"$2" >&2
 	elif islocalrepo "$1"
 	then
 		cat >| "$1/$2" < "$3"
