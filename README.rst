@@ -27,6 +27,9 @@ only (you have been warned).
 The aim is to provide confidential, authenticated git storage and
 collaboration using typical untrusted file hosts or services.
 
+There is the possibility to automatically write the commit history 
+into commit message and let it be checked at the server-side.
+
 Installation
 ............
 
@@ -34,6 +37,10 @@ Installation
   Fedora, Arch and some smaller distros are known to have packages
 
 * run the supplied ``install.sh`` script on other systems
+
+Optional:
+
+* activate the git hook as a pre-receive hook on your remote git server
 
 Quickstart
 ..........
@@ -105,6 +112,12 @@ The following ``git-config(1)`` variables are supported:
     If this flag is set to ``true``, git-remote-gcrypt will refuse to push,
     unless ``--force`` is passed, or refspecs are prefixed with ``+``.
 
+``remote.<name>.gcrypt-history``
+    ..
+``gcrypt.history``
+    If set to ``true``, the commit history (including the public key IDs used for encryption)
+    is written into the commit message. Set to ``false`` to turn this off.
+
 Environment variables
 =====================
 
@@ -128,6 +141,7 @@ How to use a git backend::
     git push gitcrypt master
 
 The URL fragment (``#next`` here) indicates which backend branch is used.
+
 
 Notes
 =====
