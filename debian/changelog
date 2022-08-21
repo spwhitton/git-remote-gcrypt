@@ -1,4 +1,4 @@
-git-remote-gcrypt (1.5-1) UNRELEASED; urgency=medium
+git-remote-gcrypt (1.5-1) unstable; urgency=medium
 
   * Pass --error-on-no-transfer to 'rclone copyto'.
     Thanks to Nathan Todd-Stone for the patch.
@@ -8,7 +8,7 @@ git-remote-gcrypt (1.5-1) UNRELEASED; urgency=medium
     - use stronger language to say that one should use local or rsync://
       instead, and also say it up in "Description".
 
- -- Sean Whitton <spwhitton@spwhitton.name>  Tue, 15 Jun 2021 13:48:38 -0700
+ -- Sean Whitton <spwhitton@spwhitton.name>  Sun, 21 Aug 2022 14:38:58 -0700
 
 git-remote-gcrypt (1.4-1) unstable; urgency=medium
 
