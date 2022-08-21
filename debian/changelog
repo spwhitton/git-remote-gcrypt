@@ -2,6 +2,11 @@ git-remote-gcrypt (1.5-1) UNRELEASED; urgency=medium
 
   * Pass --error-on-no-transfer to 'rclone copyto'.
     Thanks to Nathan Todd-Stone for the patch.
+  * README.md:
+    - explain why the arbitrary <giturl> and sftp:// backends are
+      inappropriate for most git repositories
+    - use stronger language to say that one should use local or rsync://
+      instead, and also say it up in "Description".
 
  -- Sean Whitton <spwhitton@spwhitton.name>  Tue, 15 Jun 2021 13:48:38 -0700
 

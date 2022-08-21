@@ -18,8 +18,8 @@ helper handles URIs prefixed with `gcrypt::`.
 Supported backends are `local`, `rsync://` and `sftp://`, where the
 repository is stored as a set of files, or instead any `<giturl>`
 where gcrypt will store the same representation in a git repository,
-bridged over arbitrary git transport.  See "Performance" below for
-backends comparison.
+bridged over arbitrary git transport.  Prefer `local` or `rsync://` if
+you can use one of those; see "Performance" below for discussion.
 
 There is also an experimental `rclone://` backend for early adoptors
 only (you have been warned).
@@ -156,11 +156,18 @@ Remote ID
 
 Performance
     Using an arbitrary `<giturl>` or an `sftp://` URI requires
-    uploading the entire repository history with each push.  If your
-    repository history is large or you are pushing over a slow link,
-    consider using the `rsync://` transport, which performs
-    incremental pushes.  Note that the latter won't work with a
-    repository hosting service like Gitolite, GitHub or GitLab.
+    uploading the entire repository history with each push.  This
+    means that pushes of your repository become slower over time, as
+    your git history becomes longer, and it can easily get to the
+    point that continued usage of git-remote-gcrypt is impractical.
+
+    Thus, you should use these backends only when you know that your
+    repository will not ever grow very large, not just that it's not
+    large now.  This means that these backends are inappropriate for
+    most repositories, and likely suitable only for unusual cases,
+    such as small credential stores.  Even then, use `rsync://` if you
+    can.  Note, however, that `rsync://` won't work with a repository
+    hosting service like Gitolite, GitHub or GitLab.
 
 rsync URIs
     The URI format for the rsync backend is ``rsync://user@host/path``,
