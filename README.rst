@@ -105,6 +105,8 @@ The following ``git-config(1)`` variables are supported:
     If this flag is set to ``true``, git-remote-gcrypt will refuse to push,
     unless ``--force`` is passed, or refspecs are prefixed with ``+``.
 
+    There is a potential solution here: https://bugs.debian.org/877464#32
+
 Environment variables
 =====================
 
