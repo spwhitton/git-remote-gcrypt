@@ -3,8 +3,9 @@ Source: https://git.spwhitton.name/git-remote-gcrypt
 
 Files: *
 Copyright: (C) 2013 engla
- (C) 2013, 2014 Joey Hess <id@joeyh.name>
- (C) 2016-2017 Sean Whitton and contributors
+ (C) 2013, 2014, 2021 Joey Hess <id@joeyh.name>
+ (C) 2016-2022 Sean Whitton and contributors
+ (C) 2023 Cathy J. Fitzpatrick <cathy@cathyjf.com>
 License: GPL-2+
 
 Files: debian/*
