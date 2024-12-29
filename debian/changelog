@@ -1,3 +1,15 @@
+git-remote-gcrypt (1.6-1) UNRELEASED; urgency=medium
+
+  * New integration test for gitception, tests/system-test.sh.
+    Thanks to Cathy J. Fitzpatrick for the script.
+  * README: Add a link regarding fixing the longstanding force push issue.
+    Thanks to Joey Hess for writing up the proposal.
+  * README: Clarify description of GCRYPT_FULL_REPACK.
+    The variable must be set to a non-empty string to have an effect.
+    Thanks to Cathy J. Fitzpatrick for the patch.
+
+ -- Sean Whitton <spwhitton@spwhitton.name>  Sun, 29 Dec 2024 09:37:05 +0000
+
 git-remote-gcrypt (1.5-1) unstable; urgency=medium
 
   * Pass --error-on-no-transfer to 'rclone copyto'.
